@@ -7,11 +7,16 @@ export interface User {
   id: string;
   username: string;
   email: string;
-  role: 'admin' | 'user';
   createdAt: string;
 }
 
 export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterCredentials {
+  username: string;
   email: string;
   password: string;
 }
@@ -29,6 +34,7 @@ export interface AuthContextType {
   isLoading: boolean;
   isSessionRestored: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
+  register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -40,6 +46,9 @@ type AuthAction =
   | { type: 'LOGIN_START' }
   | { type: 'LOGIN_SUCCESS'; payload: User }
   | { type: 'LOGIN_ERROR' }
+  | { type: 'REGISTER_START' }
+  | { type: 'REGISTER_SUCCESS'; payload: User }
+  | { type: 'REGISTER_ERROR' }
   | { type: 'LOGOUT' }
   | { type: 'RESTORE_SESSION'; payload: User }
   | { type: 'SET_LOADING'; payload: boolean }
@@ -59,6 +68,22 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isSessionRestored: false,
       };
     case 'LOGIN_ERROR':
+      return {
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        isSessionRestored: false,
+      };
+    case 'REGISTER_START':
+      return { ...state, isLoading: true };
+    case 'REGISTER_SUCCESS':
+      return {
+        user: action.payload,
+        isAuthenticated: true,
+        isLoading: false,
+        isSessionRestored: false,
+      };
+    case 'REGISTER_ERROR':
       return {
         user: null,
         isAuthenticated: false,
@@ -170,7 +195,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: userData._id || userData.id || '1',
             username: userData.username || userData.email?.split('@')[0] || 'usuario',
             email: userData.email || credentials.email,
-            role: userData.role || 'user',
             createdAt: userData.createdAt || new Date().toISOString(),
           };
 
@@ -215,6 +239,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const register = async (credentials: RegisterCredentials): Promise<void> => {
+    dispatch({ type: 'REGISTER_START' });
+    
+    try {
+      console.log('🔄 Intentando registro con API...');
+      
+      // Registro con el endpoint correcto
+      const response = await axios.post(`${API_BASE_URL}/users/register`, {
+        username: credentials.username,
+        email: credentials.email,
+        password: credentials.password,
+      }, {
+        timeout: 10000,
+      });
+
+      console.log('📡 Respuesta de la API:', response.data);
+
+      if (response.data) {
+        let userData = null;
+        
+        // Intentar diferentes estructuras de respuesta
+        if (response.data.user) {
+          userData = response.data.user;
+        } else if (response.data.data) {
+          userData = response.data.data;
+        } else if (response.data.id || response.data.username) {
+          userData = response.data;
+        }
+        
+        if (userData) {
+          const user: User = {
+            id: userData._id || userData.id || '1',
+            username: userData.username || credentials.username,
+            email: userData.email || credentials.email,
+            createdAt: userData.createdAt || new Date().toISOString(),
+          };
+
+          // Guardar también el token JWT si está disponible
+          const authData = {
+            user,
+            token: response.data.token || null,
+            message: response.data.message || 'Registro exitoso'
+          };
+
+          await AsyncStorage.setItem('sensorsp-user', JSON.stringify(authData));
+          dispatch({ type: 'REGISTER_SUCCESS', payload: user });
+          console.log('   Registro exitoso con API');
+        } else {
+          throw new Error('Estructura de respuesta no reconocida');
+        }
+      } else {
+        throw new Error('Respuesta vacía del servidor');
+      }
+    } catch (apiError) {
+      console.log('  Error en API:', apiError);
+      dispatch({ type: 'REGISTER_ERROR' });
+      
+      // Determinar el mensaje de error específico
+      if (axios.isAxiosError(apiError)) {
+        if (apiError.response?.status === 400) {
+          const errorMessage = apiError.response.data?.message || 'Datos incompletos o inválidos';
+          throw new Error(errorMessage);
+        } else if (apiError.response?.status === 409) {
+          throw new Error('El email o nombre de usuario ya está registrado');
+        } else if (apiError.response?.status === 500) {
+          throw new Error('Error interno del servidor. Intenta nuevamente');
+        } else if (apiError.code === 'ECONNABORTED') {
+          throw new Error('Tiempo de conexión agotado. Verifica tu conexión a internet');
+        } else if (apiError.code === 'NETWORK_ERROR') {
+          throw new Error('Error de conexión. Verifica tu conexión a internet');
+        } else {
+          throw new Error(`Error del servidor (${apiError.response?.status}). Intenta nuevamente`);
+        }
+      } else {
+        throw new Error('Error de conexión. Verifica tu conexión a internet');
+      }
+    }
+  };
+
     const logout = async (): Promise<void> => {
     try {
       console.log('🔄 Iniciando logout...');
@@ -242,6 +345,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading: state.isLoading,
     isSessionRestored: state.isSessionRestored,
     login,
+    register,
     logout,
   };
 

@@ -18,28 +18,49 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
-export const LoginScreen: React.FC = () => {
-  const [credentials, setCredentials] = useState({ email: '', password: '' });
+export const RegisterScreen: React.FC = () => {
+  const [formData, setFormData] = useState({ 
+    username: '', 
+    email: '', 
+    password: '', 
+    confirmPassword: ''
+  });
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
-  const { login, isLoading } = useAuth();
+  const { register, isLoading } = useAuth();
   const { isDark } = useTheme();
 
   const handleSubmit = async () => {
-    if (!credentials.email || !credentials.password) {
+    // Validaciones
+    if (!formData.username || !formData.email || !formData.password || !formData.confirmPassword) {
       setError('Por favor completa todos los campos');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
+    if (formData.username.length < 3) {
+      setError('El nombre de usuario debe tener al menos 3 caracteres');
       return;
     }
 
     setError('');
     
     try {
-      await login(credentials);
+      await register(formData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error de autenticación');
+      setError(err instanceof Error ? err.message : 'Error al crear la cuenta');
     }
   };
-
 
   const styles = StyleSheet.create({
     container: {
@@ -102,54 +123,54 @@ export const LoginScreen: React.FC = () => {
     },
     logoContainer: {
       alignItems: 'center',
-      marginBottom: 32,
+      marginBottom: 24,
     },
     logo: {
-      width: 72,
-      height: 72,
-      borderRadius: 20,
+      width: 64,
+      height: 64,
+      borderRadius: 18,
       backgroundColor: isDark ? 'rgba(28, 28, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)',
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: 16,
+      marginBottom: 12,
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.3)',
     },
     title: {
-      fontSize: 32,
+      fontSize: 28,
       fontWeight: '700',
       color: isDark ? '#FFFFFF' : '#1D1D1F',
       textAlign: 'center',
-      marginBottom: 8,
+      marginBottom: 6,
       letterSpacing: -0.5,
     },
     subtitle: {
-      fontSize: 17,
+      fontSize: 15,
       color: isDark ? '#8E8E93' : '#6D6D70',
       textAlign: 'center',
       fontWeight: '400',
     },
     inputContainer: {
       width: '100%',
-      marginBottom: 20,
+      marginBottom: 16,
     },
     label: {
-      fontSize: 17,
+      fontSize: 15,
       fontWeight: '600',
       color: isDark ? '#FFFFFF' : '#1D1D1F',
-      marginBottom: 8,
+      marginBottom: 6,
     },
     inputWrapper: {
-      borderRadius: 12,
+      borderRadius: 10,
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
       backgroundColor: isDark ? 'rgba(28, 28, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)',
       overflow: 'hidden',
     },
     input: {
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      fontSize: 17,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
       color: isDark ? '#FFFFFF' : '#1D1D1F',
       backgroundColor: 'transparent',
     },
@@ -158,23 +179,23 @@ export const LoginScreen: React.FC = () => {
     },
     passwordToggle: {
       position: 'absolute',
-      right: 16,
-      top: 14,
+      right: 14,
+      top: 12,
       padding: 4,
     },
     errorText: {
       color: '#FF3B30',
-      fontSize: 15,
-      marginBottom: 20,
+      fontSize: 14,
+      marginBottom: 16,
       textAlign: 'center',
       fontWeight: '500',
     },
-    loginButton: {
+    registerButton: {
       backgroundColor: isDark ? '#0A84FF' : '#007AFF',
-      borderRadius: 12,
-      paddingVertical: 16,
+      borderRadius: 10,
+      paddingVertical: 14,
       alignItems: 'center',
-      marginBottom: 24,
+      marginBottom: 20,
       shadowColor: isDark ? '#0A84FF' : '#007AFF',
       shadowOffset: {
         width: 0,
@@ -184,23 +205,23 @@ export const LoginScreen: React.FC = () => {
       shadowRadius: 8,
       elevation: 8,
     },
-    loginButtonText: {
+    registerButtonText: {
       color: '#FFFFFF',
-      fontSize: 17,
+      fontSize: 16,
       fontWeight: '600',
     },
-    registerLink: {
+    loginLink: {
       alignItems: 'center',
     },
-    registerLinkText: {
+    loginLinkText: {
       fontSize: 15,
       color: isDark ? '#8E8E93' : '#6D6D70',
       fontWeight: '400',
     },
-    registerLinkButton: {
+    loginLinkButton: {
       marginTop: 4,
     },
-    registerLinkButtonText: {
+    loginLinkButtonText: {
       fontSize: 15,
       color: isDark ? '#0A84FF' : '#007AFF',
       fontWeight: '600',
@@ -234,13 +255,29 @@ export const LoginScreen: React.FC = () => {
               {/* Logo */}
               <View style={styles.logoContainer}>
                 <View style={styles.logo}>
-                  <Text style={{ fontSize: 32, color: isDark ? '#FFFFFF' : '#1D1D1F' }}>⚡</Text>
+                  <Text style={{ fontSize: 28, color: isDark ? '#FFFFFF' : '#1D1D1F' }}>⚡</Text>
                 </View>
-                <Text style={styles.title}>SensorSP</Text>
-                <Text style={styles.subtitle}>Monitoreo inteligente</Text>
+                <Text style={styles.title}>Crear Cuenta</Text>
+                <Text style={styles.subtitle}>Únete a SensorSP</Text>
               </View>
 
-              {/* Login Form */}
+              {/* Register Form */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Nombre de Usuario</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ingresa tu nombre de usuario"
+                    placeholderTextColor={isDark ? '#8E8E93' : '#6D6D70'}
+                    value={formData.username}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, username: text }))}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!isLoading}
+                  />
+                </View>
+              </View>
+
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Email</Text>
                 <View style={styles.inputWrapper}>
@@ -248,8 +285,8 @@ export const LoginScreen: React.FC = () => {
                     style={styles.input}
                     placeholder="Ingresa tu email"
                     placeholderTextColor={isDark ? '#8E8E93' : '#6D6D70'}
-                    value={credentials.email}
-                    onChangeText={(text) => setCredentials(prev => ({ ...prev, email: text }))}
+                    value={formData.email}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"
@@ -266,8 +303,8 @@ export const LoginScreen: React.FC = () => {
                       style={styles.input}
                       placeholder="Ingresa tu contraseña"
                       placeholderTextColor={isDark ? '#8E8E93' : '#6D6D70'}
-                      value={credentials.password}
-                      onChangeText={(text) => setCredentials(prev => ({ ...prev, password: text }))}
+                      value={formData.password}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
                       secureTextEntry={!showPassword}
                       autoCapitalize="none"
                       autoCorrect={false}
@@ -279,7 +316,7 @@ export const LoginScreen: React.FC = () => {
                     >
                       <Ionicons 
                         name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
-                        size={20} 
+                        size={18} 
                         color={isDark ? '#8E8E93' : '#6D6D70'} 
                       />
                     </TouchableOpacity>
@@ -287,27 +324,57 @@ export const LoginScreen: React.FC = () => {
                 </View>
               </View>
 
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Confirmar Contraseña</Text>
+                <View style={styles.passwordContainer}>
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Confirma tu contraseña"
+                      placeholderTextColor={isDark ? '#8E8E93' : '#6D6D70'}
+                      value={formData.confirmPassword}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
+                      secureTextEntry={!showConfirmPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      editable={!isLoading}
+                    />
+                    <TouchableOpacity
+                      style={styles.passwordToggle}
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      <Ionicons 
+                        name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} 
+                        size={18} 
+                        color={isDark ? '#8E8E93' : '#6D6D70'} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
               <TouchableOpacity
-                style={[styles.loginButton, isLoading && { opacity: 0.7 }]}
+                style={[styles.registerButton, isLoading && { opacity: 0.7 }]}
                 onPress={handleSubmit}
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+                  <Text style={styles.registerButtonText}>Crear Cuenta</Text>
                 )}
               </TouchableOpacity>
 
-              <View style={styles.registerLink}>
-                <Text style={styles.registerLinkText}>¿Aún no tienes cuenta?</Text>
+              <View style={styles.loginLink}>
+                <Text style={styles.loginLinkText}>¿Ya tienes una cuenta?</Text>
                 <TouchableOpacity 
-                  style={styles.registerLinkButton}
-                  onPress={() => router.push('/register')}
+                  style={styles.loginLinkButton}
+                  onPress={() => router.push('/login')}
                 >
-                  <Text style={styles.registerLinkButtonText}>Registrarse</Text>
+                  <Text style={styles.loginLinkButtonText}>Iniciar Sesión</Text>
                 </TouchableOpacity>
               </View>
 
