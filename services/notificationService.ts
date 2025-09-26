@@ -15,15 +15,15 @@ let Notifications: any = null;
 try {
   Notifications = require('expo-notifications');
 } catch (error) {
-  console.log('ℹ️ expo-notifications no disponible en este entorno');
+  console.log(' expo-notifications no disponible en este entorno');
 }
 
 // Configurar el comportamiento de las notificaciones para que sean como WhatsApp/Facebook
 if (Notifications) {
   try {
     Notifications.setNotificationHandler({
-      handleNotification: async (notification) => {
-        console.log('📱 Notificación recibida:', notification.request.content.title);
+      handleNotification: async (notification: any) => {
+        console.log(' Notificación recibida:', notification.request.content.title);
         
         // Configuración para notificaciones reales como WhatsApp
         return {
@@ -37,7 +37,7 @@ if (Notifications) {
       },
     });
   } catch (error) {
-    console.log('⚠️ No se pudo configurar el handler de notificaciones:', error);
+    console.log('   No se pudo configurar el handler de notificaciones:', error);
   }
 }
 
@@ -82,6 +82,9 @@ export class NotificationService {
       condition: 'mayor_que',
       value: 40,
       message: '🌡️ Temperatura crítica: {value}°C. Activar ventilación.',
+      priority: 'high',
+      sound: 'default',
+      vibration: true,
     },
     {
       id: 'temp_low',
@@ -91,6 +94,9 @@ export class NotificationService {
       condition: 'menor_que',
       value: 0,
       message: '🧊 Temperatura muy baja: {value}°C. Activar calefacción.',
+      priority: 'high',
+      sound: 'default',
+      vibration: true,
     },
     {
       id: 'humidity_high',
@@ -100,6 +106,9 @@ export class NotificationService {
       condition: 'mayor_que',
       value: 80,
       message: '💧 Humedad alta: {value}%. Verificar sistema.',
+      priority: 'normal',
+      sound: 'default',
+      vibration: true,
     },
     {
       id: 'actuator_ventilador',
@@ -109,6 +118,9 @@ export class NotificationService {
       condition: 'igual_a',
       value: 'ventilador',
       message: '🌀 Ventilador activado. Temperatura: {temp}°C',
+      priority: 'normal',
+      sound: 'default',
+      vibration: true,
     },
     {
       id: 'actuator_calefactor',
@@ -118,6 +130,9 @@ export class NotificationService {
       condition: 'igual_a',
       value: 'calefactor',
       message: '🔥 Calefactor activado. Temperatura: {temp}°C',
+      priority: 'normal',
+      sound: 'default',
+      vibration: true,
     },
     {
       id: 'status_caliente',
@@ -127,6 +142,9 @@ export class NotificationService {
       condition: 'igual_a',
       value: 'caliente',
       message: '🌡️ Sistema en estado caliente. Revisar condiciones.',
+      priority: 'normal',
+      sound: 'default',
+      vibration: true,
     },
     {
       id: 'status_frio',
@@ -136,11 +154,14 @@ export class NotificationService {
       condition: 'igual_a',
       value: 'frio',
       message: '❄️ Sistema en estado frío. Revisar condiciones.',
+      priority: 'normal',
+      sound: 'default',
+      vibration: true,
     },
   ];
 
   private lastNotificationTime: { [key: string]: number } = {};
-  private readonly NOTIFICATION_COOLDOWN = 5 * 60 * 1000; // 5 minutos
+  private readonly NOTIFICATION_COOLDOWN = 0; // Sin cooldown - notificaciones inmediatas
 
   static getInstance(): NotificationService {
     if (!NotificationService.instance) {
@@ -152,24 +173,24 @@ export class NotificationService {
   async requestPermissions(): Promise<boolean> {
     // Si estamos en web, no hay notificaciones disponibles
     if (isWeb) {
-      console.log('ℹ️ Las notificaciones no están disponibles en web');
+      console.log(' Las notificaciones no están disponibles en web');
       return false;
     }
 
     // Si estamos en Expo Go, mostrar mensaje informativo y retornar false
     if (isExpoGo) {
-      console.log('ℹ️ Las notificaciones push no están soportadas en Expo Go. Las notificaciones se simularán en consola.');
+      console.log(' Las notificaciones push no están soportadas en Expo Go. Las notificaciones se simularán en consola.');
       return false;
     }
 
     // Solo continuar en development builds con expo-notifications disponible
     if (!isDevelopmentBuild || !Notifications) {
-      console.log('ℹ️ Las notificaciones solo están disponibles en development builds');
+      console.log(' Las notificaciones solo están disponibles en development builds');
       return false;
     }
 
     if (!Device.isDevice) {
-      console.log('⚠️ Las notificaciones solo funcionan en dispositivos físicos');
+      console.log('   Las notificaciones solo funcionan en dispositivos físicos');
       return false;
     }
 
@@ -183,7 +204,7 @@ export class NotificationService {
       }
 
       if (finalStatus !== 'granted') {
-        console.log('❌ Permisos de notificación no otorgados');
+        console.log('  Permisos de notificación no otorgados');
         return false;
       }
 
@@ -199,14 +220,14 @@ export class NotificationService {
             lightColor: '#FF231F7C',
           });
         } catch (error) {
-          console.log('⚠️ No se pudo configurar el canal de notificaciones:', error);
+          console.log('   No se pudo configurar el canal de notificaciones:', error);
         }
       }
 
-      console.log('✅ Permisos de notificación otorgados');
+      console.log('   Permisos de notificación otorgados');
       return true;
     } catch (error) {
-      console.error('❌ Error al solicitar permisos de notificación:', error);
+      console.error('  Error al solicitar permisos de notificación:', error);
       return false;
     }
   }
@@ -214,19 +235,19 @@ export class NotificationService {
   async scheduleNotification(title: string, body: string, data?: any): Promise<string> {
     // Si estamos en web, no hay notificaciones disponibles
     if (isWeb) {
-      console.log(`📱 [Web] Notificación simulada: ${title} - ${body}`);
+      console.log(` [Web] Notificación simulada: ${title} - ${body}`);
       return 'web-simulated';
     }
 
     // Si estamos en Expo Go, solo mostrar en consola
     if (isExpoGo) {
-      console.log(`📱 [Expo Go] Notificación simulada: ${title} - ${body}`);
+      console.log(` [Expo Go] Notificación simulada: ${title} - ${body}`);
       return 'expo-go-simulated';
     }
 
     // Solo intentar notificaciones reales en development builds con expo-notifications disponible
     if (!isDevelopmentBuild || !Notifications) {
-      console.log(`📱 [Simulated] Notificación simulada: ${title} - ${body}`);
+      console.log(` [Simulated] Notificación simulada: ${title} - ${body}`);
       return 'simulated';
     }
 
@@ -241,12 +262,12 @@ export class NotificationService {
         trigger: null, // Notificación inmediata
       });
 
-      console.log(`📱 Notificación enviada: ${title}`);
+      console.log(` Notificación enviada: ${title}`);
       return notificationId;
     } catch (error) {
-      console.error('❌ Error al enviar notificación:', error);
+      console.error('  Error al enviar notificación:', error);
       // En lugar de lanzar error, retornar un ID simulado
-      console.log(`📱 [Error] Notificación simulada: ${title} - ${body}`);
+      console.log(` [Error] Notificación simulada: ${title} - ${body}`);
       return 'error-simulated';
     }
   }
@@ -263,14 +284,7 @@ export class NotificationService {
   }
 
   private evaluateRule(rule: NotificationRule, sensorData: SensorData): boolean {
-    const now = Date.now();
-    const lastNotification = this.lastNotificationTime[rule.id] || 0;
-
-    // Verificar cooldown
-    if (now - lastNotification < this.NOTIFICATION_COOLDOWN) {
-      return false;
-    }
-
+    // Sin cooldown - evaluar inmediatamente si se cumple la condición
     switch (rule.type) {
       case 'temperature':
         return this.evaluateTemperatureRule(rule, sensorData.temperatura);
@@ -328,8 +342,8 @@ export class NotificationService {
       }
     );
 
-    // Actualizar tiempo de última notificación
-    this.lastNotificationTime[rule.id] = Date.now();
+    // Sin cooldown - no actualizar tiempo de última notificación
+    console.log(`🔔 Notificación enviada inmediatamente: ${rule.name}`);
   }
 
   private formatMessage(template: string, sensorData: SensorData): string {
@@ -349,13 +363,13 @@ export class NotificationService {
     const ruleIndex = this.notificationRules.findIndex(rule => rule.id === ruleId);
     if (ruleIndex !== -1) {
       this.notificationRules[ruleIndex] = { ...this.notificationRules[ruleIndex], ...updates };
-      console.log(`✅ Regla de notificación actualizada: ${ruleId}`);
+      console.log(`   Regla de notificación actualizada: ${ruleId}`);
     }
   }
 
   addNotificationRule(rule: NotificationRule): void {
     this.notificationRules.push(rule);
-    console.log(`✅ Nueva regla de notificación agregada: ${rule.name}`);
+    console.log(`   Nueva regla de notificación agregada: ${rule.name}`);
   }
 
   removeNotificationRule(ruleId: string): void {
@@ -366,7 +380,7 @@ export class NotificationService {
   async getNotificationHistory(): Promise<any[]> {
     // Si estamos en Expo Go o web, retornar array vacío
     if (isExpoGo || isWeb || !isDevelopmentBuild || !Notifications) {
-      console.log('ℹ️ Historial de notificaciones no disponible en este entorno');
+      console.log(' Historial de notificaciones no disponible en este entorno');
       return [];
     }
 
@@ -374,7 +388,7 @@ export class NotificationService {
       const notifications = await Notifications.getPresentedNotificationsAsync();
       return notifications;
     } catch (error) {
-      console.error('❌ Error al obtener historial de notificaciones:', error);
+      console.error('  Error al obtener historial de notificaciones:', error);
       return [];
     }
   }
@@ -382,7 +396,7 @@ export class NotificationService {
   async clearAllNotifications(): Promise<void> {
     // Si estamos en Expo Go o web, solo mostrar mensaje
     if (isExpoGo || isWeb || !isDevelopmentBuild || !Notifications) {
-      console.log('ℹ️ Limpieza de notificaciones no disponible en este entorno');
+      console.log(' Limpieza de notificaciones no disponible en este entorno');
       return;
     }
 
@@ -390,7 +404,7 @@ export class NotificationService {
       await Notifications.dismissAllNotificationsAsync();
       console.log('🗑️ Todas las notificaciones eliminadas');
     } catch (error) {
-      console.error('❌ Error al eliminar notificaciones:', error);
+      console.error('  Error al eliminar notificaciones:', error);
     }
   }
 }

@@ -183,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           await AsyncStorage.setItem('sensorsp-user', JSON.stringify(authData));
           dispatch({ type: 'LOGIN_SUCCESS', payload: user });
-          console.log('✅ Login exitoso con API');
+          console.log('   Login exitoso con API');
         } else {
           throw new Error('Estructura de respuesta no reconocida');
         }
@@ -191,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Respuesta vacía del servidor');
       }
     } catch (apiError) {
-      console.log('❌ Error en API:', apiError);
+      console.log('  Error en API:', apiError);
       dispatch({ type: 'LOGIN_ERROR' });
       
       // Determinar el mensaje de error específico
@@ -221,18 +221,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Limpiar el almacenamiento primero
       await AsyncStorage.removeItem('sensorsp-user');
-      console.log('✅ Datos de sesión eliminados del almacenamiento');
+      console.log('   Datos de sesión eliminados del almacenamiento');
       
       // Luego actualizar el estado
       dispatch({ type: 'LOGOUT' });
-      console.log('✅ Estado de autenticación actualizado - isAuthenticated: false');
+      console.log('   Estado de autenticación actualizado - isAuthenticated: false');
       
-      console.log('✅ Logout completado exitosamente');
+      console.log('   Logout completado exitosamente');
     } catch (error) {
-      console.error('❌ Error durante logout:', error);
+      console.error('  Error durante logout:', error);
       // Aún así, asegurar que el estado esté limpio
       dispatch({ type: 'LOGOUT' });
-      console.log('✅ Estado limpiado a pesar del error');
+      console.log('   Estado limpiado a pesar del error');
     }
   };
 

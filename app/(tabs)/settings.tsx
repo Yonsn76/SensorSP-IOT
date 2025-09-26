@@ -104,7 +104,7 @@ export default function SettingsScreen() {
   ]);
 
   const handleLogout = async () => {
-    console.log('📱 handleLogout() llamada - Mostrando alerta de confirmación');
+    console.log(' handleLogout() llamada - Mostrando alerta de confirmación');
     
     try {
       console.log('🔄 Creando alerta de confirmación...');
@@ -117,29 +117,29 @@ export default function SettingsScreen() {
             text: 'Cancelar', 
             style: 'cancel',
             onPress: () => {
-              console.log('❌ Usuario canceló el logout');
+              console.log('  Usuario canceló el logout');
             }
           },
           {
             text: 'Cerrar Sesión',
             style: 'destructive',
             onPress: async () => {
-              console.log('✅ Usuario confirmó el logout - Iniciando proceso...');
+              console.log('   Usuario confirmó el logout - Iniciando proceso...');
               try {
                 console.log('🔄 Llamando a logout() del AuthContext...');
                 await logout();
-                console.log('✅ Logout del AuthContext completado exitosamente');
+                console.log('   Logout del AuthContext completado exitosamente');
                 
                 // Navegar explícitamente al login
                 console.log('🔄 Intentando navegar al login con router.replace...');
                 router.replace('/login');
-                console.log('✅ Navegación al login ejecutada');
+                console.log('   Navegación al login ejecutada');
               } catch (error) {
-                console.error('❌ Error en logout:', error);
+                console.error('  Error en logout:', error);
                 console.log('🔄 Intentando navegar al login a pesar del error...');
                 // Aún así, intentar navegar al login
                 router.replace('/login');
-                console.log('✅ Navegación al login ejecutada (después de error)');
+                console.log('   Navegación al login ejecutada (después de error)');
               }
             }
           }
@@ -147,17 +147,17 @@ export default function SettingsScreen() {
         { cancelable: true }
       );
       
-      console.log('✅ Alerta de confirmación mostrada');
+      console.log('   Alerta de confirmación mostrada');
     } catch (error) {
-      console.error('❌ Error al mostrar alerta:', error);
+      console.error('  Error al mostrar alerta:', error);
       // Si hay error con la alerta, hacer logout directo
       console.log('🔄 Haciendo logout directo sin confirmación...');
       try {
         await logout();
         router.replace('/login');
-        console.log('✅ Logout directo completado');
+        console.log('   Logout directo completado');
       } catch (logoutError) {
-        console.error('❌ Error en logout directo:', logoutError);
+        console.error('  Error en logout directo:', logoutError);
       }
     }
   };
@@ -618,7 +618,7 @@ export default function SettingsScreen() {
                 Alert.alert(
                   'SensorSP - Información',
                   '🌡️ Aplicación de Monitoreo IoT\n\n' +
-                  '📱 Versión: 2025.1.0\n' +
+                  ' Versión: 2025.1.0\n' +
                   '🏗️ Plataforma: React Native + Expo\n' +
                   '📅 Última actualización: Enero 2025\n\n' +
                   '👨‍💻 Desarrollado por: Yonsn76\n' +
@@ -703,11 +703,11 @@ export default function SettingsScreen() {
             try {
               console.log('🔄 Logout iniciado...');
               await logout();
-              console.log('✅ Logout completado');
+              console.log('   Logout completado');
               router.replace('/login');
-              console.log('✅ Navegación al login completada');
+              console.log('   Navegación al login completada');
             } catch (error) {
-              console.error('❌ Error en logout:', error);
+              console.error('  Error en logout:', error);
             }
           }}
         >

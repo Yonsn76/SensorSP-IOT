@@ -96,7 +96,7 @@ export default function AdvancedExportModal({ visible, onClose }: AdvancedExport
       );
       
     } catch (error) {
-      console.error('❌ Error en exportación:', error);
+      console.error('  Error en exportación:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       Alert.alert(
         'Error en Exportación',
@@ -115,7 +115,7 @@ export default function AdvancedExportModal({ visible, onClose }: AdvancedExport
       setPreviewData(data);
       setShowPreview(true);
     } catch (error) {
-      console.error('❌ Error generando vista previa:', error);
+      console.error('  Error generando vista previa:', error);
       Alert.alert(
         'Error en Vista Previa',
         'No se pudo generar la vista previa de los datos.',

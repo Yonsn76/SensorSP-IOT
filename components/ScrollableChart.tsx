@@ -42,7 +42,7 @@ export default function ScrollableChart({
   };
 
   const requiredWidth = calculateRequiredWidth();
-  const needsScroll = requiredWidth > screenWidth - 40; // Margen para el contenedor
+  const needsScroll = requiredWidth > screenWidth - 80; // Margen para el contenedor
 
   const handleContentSizeChange = (contentWidth: number, contentHeight: number) => {
     setContentWidth(Math.max(contentWidth, requiredWidth));
@@ -67,13 +67,15 @@ export default function ScrollableChart({
       position: 'absolute',
       top: 8,
       right: 8,
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)',
       borderRadius: 12,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
       flexDirection: 'row',
       alignItems: 'center',
       zIndex: 10,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
     },
     scrollIndicatorText: {
       fontSize: 10,
@@ -93,7 +95,7 @@ export default function ScrollableChart({
             color={isDark ? '#FFFFFF' : '#000000'} 
           />
           <Text style={styles.scrollIndicatorText}>
-            Desliza para ver más
+            Desliza →
           </Text>
         </View>
       )}
@@ -108,9 +110,12 @@ export default function ScrollableChart({
         ]}
         onContentSizeChange={handleContentSizeChange}
         scrollEnabled={needsScroll}
-        bounces={false}
-        decelerationRate="fast"
+        bounces={true}
+        decelerationRate="normal"
         style={styles.scrollView}
+        pagingEnabled={false}
+        snapToInterval={needsScroll ? 50 : undefined}
+        snapToAlignment="start"
       >
         <View style={[styles.chartWrapper, { width: needsScroll ? requiredWidth : '100%' }]}>
           {children}

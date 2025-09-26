@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import AddAlertModal from '../../components/AddAlertModal';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
@@ -51,9 +51,9 @@ export default function NotificationsScreen() {
       const history = await notificationService.getNotificationHistory();
       setNotificationHistory(history);
       
-      console.log('✅ Notifications loaded successfully');
+      console.log('   Notifications loaded successfully');
     } catch (error) {
-      console.error('❌ Error loading notifications:', error);
+      console.error('  Error loading notifications:', error);
     } finally {
       setLoading(false);
     }

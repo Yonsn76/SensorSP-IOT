@@ -72,7 +72,7 @@ export default function ExportModal({ visible, onClose }: ExportModalProps) {
       );
       
     } catch (error) {
-      console.error('❌ Error en exportación:', error);
+      console.error('  Error en exportación:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       Alert.alert(
         'Error en Exportación',

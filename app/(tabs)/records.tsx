@@ -49,10 +49,10 @@ export default function RecordsScreen() {
       console.log('📊 Data length:', data.length);
       console.log('📊 First record:', data[0]);
       setSensorData(data);
-      console.log(`✅ Loaded ${data.length} sensor records`);
+      console.log(`   Loaded ${data.length} sensor records`);
     } catch (error) {
-      console.error('❌ Error loading sensor records:', error);
-      console.error('❌ Error details:', error);
+      console.error('  Error loading sensor records:', error);
+      console.error('  Error details:', error);
     } finally {
       setLoading(false);
     }

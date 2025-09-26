@@ -83,10 +83,10 @@ class ExportService {
       const dirInfo = await FileSystem.getInfoAsync(this.EXPORT_DIR);
       if (!dirInfo.exists) {
         await FileSystem.makeDirectoryAsync(this.EXPORT_DIR, { intermediates: true });
-        console.log('✅ Directorio de exportación creado');
+        console.log('   Directorio de exportación creado');
       }
     } catch (error) {
-      console.error('❌ Error creando directorio de exportación:', error);
+      console.error('  Error creando directorio de exportación:', error);
     }
   }
 
@@ -149,7 +149,7 @@ class ExportService {
           }
           
           data.sensors = sensorData;
-          console.log(`✅ ${data.sensors.length} registros de sensores recopilados`);
+          console.log(`   ${data.sensors.length} registros de sensores recopilados`);
         
         // Calcular estadísticas
         if (data.sensors.length > 0) {
@@ -163,7 +163,7 @@ class ExportService {
               Math.round((hums.reduce((sum, hum) => sum + hum, 0) / hums.length) * 10) / 10 : 0;
           }
         } catch (error) {
-          console.error('❌ Error recopilando datos de sensores:', error);
+          console.error('  Error recopilando datos de sensores:', error);
           // Continuar sin datos de sensores
         }
       }
@@ -176,9 +176,9 @@ class ExportService {
           data.notifications.history = await notificationService.getNotificationHistory();
           data.stats.totalNotifications = data.notifications.history.length;
           data.stats.activeRules = data.notifications.rules.filter(rule => rule.enabled).length;
-          console.log(`✅ ${data.notifications.rules.length} reglas y ${data.notifications.history.length} notificaciones recopiladas`);
+          console.log(`   ${data.notifications.rules.length} reglas y ${data.notifications.history.length} notificaciones recopiladas`);
         } catch (error) {
-          console.log('⚠️ No se pudieron recopilar datos de notificaciones:', error);
+          console.log('   No se pudieron recopilar datos de notificaciones:', error);
           // Continuar sin datos de notificaciones
         }
       }
@@ -194,16 +194,16 @@ class ExportService {
           data.settings.theme = theme || 'system';
           data.settings.user = user ? JSON.parse(user) : null;
           data.settings.appConfig = appSettings ? JSON.parse(appSettings) : {};
-          console.log('✅ Configuraciones recopiladas');
+          console.log('   Configuraciones recopiladas');
         } catch (error) {
-          console.log('⚠️ No se pudieron recopilar configuraciones:', error);
+          console.log('   No se pudieron recopilar configuraciones:', error);
           // Continuar con configuraciones por defecto
         }
       }
 
-      console.log('✅ Recopilación de datos completada');
+      console.log('   Recopilación de datos completada');
     } catch (error) {
-      console.error('❌ Error recopilando datos para exportación:', error);
+      console.error('  Error recopilando datos para exportación:', error);
       throw new Error(`Error al recopilar datos: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
 
@@ -423,7 +423,7 @@ class ExportService {
                   <td>${rule.type}</td>
                   <td>${rule.condition}</td>
                   <td>${rule.value}</td>
-                  <td>${rule.enabled ? '✅ Activa' : '❌ Inactiva'}</td>
+                  <td>${rule.enabled ? '   Activa' : '  Inactiva'}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -433,7 +433,7 @@ class ExportService {
 
         ${data.notifications.history.length > 0 ? `
         <div class="section">
-          <h2>📱 Historial de Notificaciones (${data.notifications.history.length} notificaciones)</h2>
+          <h2> Historial de Notificaciones (${data.notifications.history.length} notificaciones)</h2>
           <table>
             <thead>
               <tr>
@@ -473,7 +473,7 @@ class ExportService {
       const { uri } = await Print.printToFileAsync({ html });
       return uri;
     } catch (error) {
-      console.error('❌ Error generando PDF:', error);
+      console.error('  Error generando PDF:', error);
       throw new Error('Error al generar PDF');
     }
   }
@@ -549,11 +549,11 @@ class ExportService {
         throw new Error('Error al crear el archivo de exportación');
       }
       
-      console.log(`✅ Exportación completada: ${fileName} (${fileInfo.size} bytes)`);
+      console.log(`   Exportación completada: ${fileName} (${fileInfo.size} bytes)`);
       return fileUri;
       
     } catch (error) {
-      console.error('❌ Error en exportación:', error);
+      console.error('  Error en exportación:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       throw new Error(`Error al exportar datos: ${errorMessage}`);
     }
@@ -584,9 +584,9 @@ class ExportService {
         UTI: this.getUTI(fileUri)
       });
       
-        console.log('✅ Archivo compartido exitosamente');
+        console.log('   Archivo compartido exitosamente');
     } catch (error) {
-      console.error('❌ Error compartiendo archivo:', error);
+      console.error('  Error compartiendo archivo:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       throw new Error(`Error al compartir archivo: ${errorMessage}`);
     }
@@ -615,7 +615,7 @@ class ExportService {
         file.endsWith('.pdf')
       );
     } catch (error) {
-      console.error('❌ Error obteniendo historial de exportaciones:', error);
+      console.error('  Error obteniendo historial de exportaciones:', error);
       return [];
     }
   }
@@ -624,9 +624,9 @@ class ExportService {
     try {
       const fileUri = `${this.EXPORT_DIR}${fileName}`;
       await FileSystem.deleteAsync(fileUri);
-      console.log(`✅ Archivo eliminado: ${fileName}`);
+      console.log(`   Archivo eliminado: ${fileName}`);
     } catch (error) {
-      console.error('❌ Error eliminando archivo:', error);
+      console.error('  Error eliminando archivo:', error);
       throw new Error('Error al eliminar archivo');
     }
   }
@@ -637,9 +637,9 @@ class ExportService {
       for (const file of files) {
         await this.deleteExport(file);
       }
-      console.log('✅ Todos los archivos de exportación eliminados');
+      console.log('   Todos los archivos de exportación eliminados');
     } catch (error) {
-      console.error('❌ Error limpiando exportaciones:', error);
+      console.error('  Error limpiando exportaciones:', error);
       throw new Error('Error al limpiar exportaciones');
     }
   }

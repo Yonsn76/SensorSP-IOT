@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-    Dimensions,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import CustomDateRangeSelector, { DateRange } from '../../components/CustomDateRangeSelector';
@@ -227,7 +227,13 @@ export default function HistoricsScreen() {
       strokeWidth: 1,
     },
     propsForLabels: {
-      fontSize: 10,
+      fontSize: screenWidth < 400 ? 8 : 10,
+    },
+    propsForVerticalLabels: {
+      fontSize: screenWidth < 400 ? 8 : 10,
+    },
+    propsForHorizontalLabels: {
+      fontSize: screenWidth < 400 ? 8 : 10,
     },
   });
 
@@ -306,6 +312,7 @@ export default function HistoricsScreen() {
       borderRadius: 20,
       overflow: 'hidden',
       marginBottom: 20,
+      marginHorizontal: screenWidth < 400 ? 10 : 0,
       // Liquid Glass effect
       backgroundColor: isDark ? 'rgba(28, 28, 30, 0.9)' : 'rgba(255, 255, 255, 0.9)',
       borderWidth: 1.5,
@@ -321,7 +328,7 @@ export default function HistoricsScreen() {
       elevation: 8,
     },
     chartContent: {
-      padding: 20,
+      padding: screenWidth < 400 ? 15 : 20,
     },
     chartTitle: {
       fontSize: 18,
@@ -344,6 +351,11 @@ export default function HistoricsScreen() {
       fontSize: 16,
       color: isDark ? '#8E8E93' : '#6D6D70',
       marginTop: 16,
+    },
+    pieChartWrapper: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
     },
   });
 
@@ -437,12 +449,12 @@ export default function HistoricsScreen() {
                          {getHourlyTrends().datasets[0].data.length > 0 ? (
                <ScrollableChart 
                  dataLength={getHourlyTrends().labels.length}
-                 maxVisiblePoints={12}
-                 chartWidth={Math.max(screenWidth - 80, getHourlyTrends().labels.length * 40)}
+                 maxVisiblePoints={screenWidth < 400 ? 6 : 8}
+                 chartWidth={Math.max(screenWidth - 80, getHourlyTrends().labels.length * (screenWidth < 400 ? 50 : 40))}
                >
                  <BarChart
                    data={getHourlyTrends()}
-                   width={Math.max(screenWidth - 80, getHourlyTrends().labels.length * 40)}
+                   width={Math.max(screenWidth - 80, getHourlyTrends().labels.length * (screenWidth < 400 ? 50 : 40))}
                    height={220}
                    chartConfig={getChartConfig()}
                    yAxisLabel=""
@@ -470,16 +482,18 @@ export default function HistoricsScreen() {
                Porcentaje de tiempo en cada estado (Bajo, Normal, Alto). Muestra claramente cómo se comporta el ambiente.
              </Text>
             {getStatusDistribution().length > 0 ? (
-              <PieChart
-                data={getStatusDistribution()}
-                width={screenWidth - 80}
-                height={220}
-                chartConfig={getChartConfig()}
-                accessor="population"
-                backgroundColor="transparent"
-                paddingLeft="15"
-                absolute
-              />
+              <View style={styles.pieChartWrapper}>
+                <PieChart
+                  data={getStatusDistribution()}
+                  width={Math.min(screenWidth - 80, 300)}
+                  height={220}
+                  chartConfig={getChartConfig()}
+                  accessor="population"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                />
+              </View>
             ) : (
               <Text style={styles.loadingText}>No hay datos disponibles</Text>
             )}
@@ -533,12 +547,12 @@ export default function HistoricsScreen() {
                          {getEfficiencyAnalysis().datasets[0].data.length > 0 ? (
                <ScrollableChart 
                  dataLength={getEfficiencyAnalysis().labels.length}
-                 maxVisiblePoints={6}
-                 chartWidth={Math.max(screenWidth - 80, getEfficiencyAnalysis().labels.length * 60)}
+                 maxVisiblePoints={screenWidth < 400 ? 3 : 6}
+                 chartWidth={Math.max(screenWidth - 80, getEfficiencyAnalysis().labels.length * (screenWidth < 400 ? 80 : 60))}
                >
                  <BarChart
                    data={getEfficiencyAnalysis()}
-                   width={Math.max(screenWidth - 80, getEfficiencyAnalysis().labels.length * 60)}
+                   width={Math.max(screenWidth - 80, getEfficiencyAnalysis().labels.length * (screenWidth < 400 ? 80 : 60))}
                    height={220}
                    chartConfig={getChartConfig()}
                    yAxisLabel=""

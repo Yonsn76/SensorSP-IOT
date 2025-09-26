@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import React, { useState } from 'react';
 import {
@@ -259,9 +260,11 @@ export const LoginScreen: React.FC = () => {
                       style={styles.passwordToggle}
                       onPress={() => setShowPassword(!showPassword)}
                     >
-                      <Text style={{ color: isDark ? '#8E8E93' : '#6D6D70', fontSize: 20 }}>
-                        {showPassword ? '🙈' : '👁️'}
-                      </Text>
+                      <Ionicons 
+                        name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
+                        size={20} 
+                        color={isDark ? '#8E8E93' : '#6D6D70'} 
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>

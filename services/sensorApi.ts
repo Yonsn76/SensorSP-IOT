@@ -112,7 +112,7 @@ class SensorApiService {
       }
       return null;
     } catch (error) {
-      console.error('❌ Error fetching latest sensor:', error);
+      console.error('  Error fetching latest sensor:', error);
       return null;
     }
   }
@@ -140,7 +140,7 @@ class SensorApiService {
       
       return this.getTemperatureTrend(sensors);
     } catch (error) {
-      console.error('❌ Error fetching last hours data:', error);
+      console.error('  Error fetching last hours data:', error);
       return [];
     }
   }
@@ -159,7 +159,7 @@ class SensorApiService {
       
       return this.getTemperatureTrend(sensors);
     } catch (error) {
-      console.error('❌ Error fetching today data:', error);
+      console.error('  Error fetching today data:', error);
       return [];
     }
   }
@@ -177,7 +177,7 @@ class SensorApiService {
       
       return this.getTemperatureTrend(sensors);
     } catch (error) {
-      console.error('❌ Error fetching chart data:', error);
+      console.error('  Error fetching chart data:', error);
       return [];
     }
   }
@@ -195,7 +195,7 @@ class SensorApiService {
       
       return this.getTemperatureTrend(sensors);
     } catch (error) {
-      console.error('❌ Error fetching weekly data:', error);
+      console.error('  Error fetching weekly data:', error);
       return [];
     }
   }
@@ -213,7 +213,7 @@ class SensorApiService {
       
       return this.getTemperatureTrend(sensors);
     } catch (error) {
-      console.error('❌ Error fetching monthly data:', error);
+      console.error('  Error fetching monthly data:', error);
       return [];
     }
   }
@@ -228,7 +228,7 @@ class SensorApiService {
       
       return this.getTemperatureTrend(sensors);
     } catch (error) {
-      console.error('❌ Error fetching custom range data:', error);
+      console.error('  Error fetching custom range data:', error);
       return [];
     }
   }
@@ -246,7 +246,7 @@ class SensorApiService {
       
       return this.getTemperatureTrend(sensors);
     } catch (error) {
-      console.error('❌ Error fetching yearly data:', error);
+      console.error('  Error fetching yearly data:', error);
       return [];
     }
   }

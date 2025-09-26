@@ -23,7 +23,7 @@ export default function RootLayout() {
         await notificationService.requestPermissions();
         console.log('Servicio de notificaciones inicializado');
       } catch (error) {
-        console.log('ℹ️ Notificaciones no disponibles (normal en Expo Go)');
+        console.log(' Notificaciones no disponibles (normal en Expo Go)');
       }
     };
 
