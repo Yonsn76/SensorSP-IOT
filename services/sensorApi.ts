@@ -7,6 +7,9 @@ const API_BASE_URL = 'https://iotapi.up.railway.app/api';
 export interface SensorData {
   _id: string;
   fecha: string;
+  sensorId?: string;
+  ubicacion?: string;
+  tipo_sensor?: string;
   temperatura: number;
   humedad: number;
   estado: 'normal' | 'frio' | 'caliente';
@@ -247,6 +250,109 @@ class SensorApiService {
       return this.getTemperatureTrend(sensors);
     } catch (error) {
       console.error('  Error fetching yearly data:', error);
+      return [];
+    }
+  }
+
+  // Get sensors by specific sensorId
+  async getSensorsBySensorId(sensorId: string): Promise<SensorData[]> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/sensors`);
+      return response.data.filter((sensor: SensorData) => sensor.sensorId === sensorId);
+    } catch (error) {
+      console.error('Error fetching sensors by sensorId:', error);
+      return [];
+    }
+  }
+
+  // Get last hours data for specific sensor
+  async getLastHoursDataBySensorId(sensorId: string): Promise<Array<{ fecha: string; temperatura: number; humedad: number }>> {
+    try {
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
+      
+      const sensors = await this.getSensorsBySensorId(sensorId);
+      const filteredSensors = sensors.filter(sensor => {
+        const sensorDate = new Date(sensor.fecha);
+        return sensorDate >= startDate && sensorDate <= endDate;
+      });
+      
+      return this.getTemperatureTrend(filteredSensors);
+    } catch (error) {
+      console.error('Error fetching last hours data by sensorId:', error);
+      return [];
+    }
+  }
+
+  // Get today data for specific sensor
+  async getTodayDataBySensorId(sensorId: string): Promise<Array<{ fecha: string; temperatura: number; humedad: number }>> {
+    try {
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
+      
+      const sensors = await this.getSensorsBySensorId(sensorId);
+      const filteredSensors = sensors.filter(sensor => {
+        const sensorDate = new Date(sensor.fecha);
+        return sensorDate >= startDate && sensorDate <= endDate;
+      });
+      
+      return this.getTemperatureTrend(filteredSensors);
+    } catch (error) {
+      console.error('Error fetching today data by sensorId:', error);
+      return [];
+    }
+  }
+
+  // Get weekly data for specific sensor
+  async getWeeklyDataBySensorId(sensorId: string): Promise<Array<{ fecha: string; temperatura: number; humedad: number }>> {
+    try {
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+      
+      const sensors = await this.getSensorsBySensorId(sensorId);
+      const filteredSensors = sensors.filter(sensor => {
+        const sensorDate = new Date(sensor.fecha);
+        return sensorDate >= startDate && sensorDate <= endDate;
+      });
+      
+      return this.getTemperatureTrend(filteredSensors);
+    } catch (error) {
+      console.error('Error fetching weekly data by sensorId:', error);
+      return [];
+    }
+  }
+
+  // Get monthly data for specific sensor
+  async getMonthlyDataBySensorId(sensorId: string): Promise<Array<{ fecha: string; temperatura: number; humedad: number }>> {
+    try {
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+      
+      const sensors = await this.getSensorsBySensorId(sensorId);
+      const filteredSensors = sensors.filter(sensor => {
+        const sensorDate = new Date(sensor.fecha);
+        return sensorDate >= startDate && sensorDate <= endDate;
+      });
+      
+      return this.getTemperatureTrend(filteredSensors);
+    } catch (error) {
+      console.error('Error fetching monthly data by sensorId:', error);
+      return [];
+    }
+  }
+
+  // Get custom range data for specific sensor
+  async getCustomRangeDataBySensorId(sensorId: string, startDate: Date, endDate: Date): Promise<Array<{ fecha: string; temperatura: number; humedad: number }>> {
+    try {
+      const sensors = await this.getSensorsBySensorId(sensorId);
+      const filteredSensors = sensors.filter(sensor => {
+        const sensorDate = new Date(sensor.fecha);
+        return sensorDate >= startDate && sensorDate <= endDate;
+      });
+      
+      return this.getTemperatureTrend(filteredSensors);
+    } catch (error) {
+      console.error('Error fetching custom range data by sensorId:', error);
       return [];
     }
   }

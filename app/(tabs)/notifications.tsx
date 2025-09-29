@@ -41,7 +41,7 @@ export default function NotificationsScreen() {
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Loading notifications...');
+      console.log('Loading notifications...');
       
       // Load notification rules
       const rules = notificationService.getNotificationRules();
@@ -72,7 +72,7 @@ export default function NotificationsScreen() {
 
   const deleteNotificationRule = (ruleId: string) => {
     Alert.alert(
-      '🗑️ Eliminar Alerta',
+      'Eliminar Alerta',
       '¿Estás seguro de que quieres eliminar esta alerta?',
       [
         { text: 'Cancelar', style: 'cancel' },
@@ -135,16 +135,44 @@ export default function NotificationsScreen() {
       backgroundColor: isDark ? '#000000' : '#F2F2F7',
     },
     header: {
-      padding: 20,
-      paddingTop: 60,
+      padding: 16,
+      paddingTop: 10,
       backgroundColor: 'transparent',
     },
+    headerGlass: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      shadowColor: isDark ? '#000000' : '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    headerIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+    },
     headerTitle: {
-      fontSize: 34,
-      fontWeight: '700',
-      color: isDark ? '#FFFFFF' : '#1D1D1F',
-      marginBottom: 4,
-      letterSpacing: -0.5,
+      fontSize: 18,
+      fontWeight: '600',
+      color: isDark ? '#FFFFFF' : '#000000',
+      flex: 1,
+      letterSpacing: -0.2,
     },
     headerSubtitle: {
       fontSize: 17,
@@ -194,9 +222,25 @@ export default function NotificationsScreen() {
       color: isDark ? '#FFFFFF' : '#000000',
       marginBottom: 4,
     },
+    ruleLocation: {
+      fontSize: 12,
+      color: isDark ? '#8E8E93' : '#6D6D70',
+      marginBottom: 4,
+    },
     ruleStatus: {
       fontSize: 12,
       color: isDark ? '#FFFFFF' : '#000000',
+    },
+    ruleLastTriggered: {
+      fontSize: 11,
+      color: isDark ? '#8E8E93' : '#6D6D70',
+      marginTop: 2,
+    },
+    ruleMessage: {
+      fontSize: 11,
+      color: isDark ? '#8E8E93' : '#6D6D70',
+      marginTop: 2,
+      fontStyle: 'italic',
     },
     ruleActions: {
       flexDirection: 'row',
@@ -303,8 +347,7 @@ export default function NotificationsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Notificaciones</Text>
-          <Text style={styles.headerSubtitle}>
+          <Text style={styles.headerTitle}>
             Bienvenido, {user?.username || 'Cargando...'}
           </Text>
         </View>
@@ -323,10 +366,14 @@ export default function NotificationsScreen() {
       <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notificaciones</Text>
-        <Text style={styles.headerSubtitle}>
-          Bienvenido, {user?.username || 'Usuario'}
-        </Text>
+        <View style={styles.headerGlass}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerIconContainer}>
+              <Ionicons name="notifications-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+            </View>
+            <Text style={styles.headerTitle}>Avisos del sistema</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView 
@@ -397,6 +444,10 @@ export default function NotificationsScreen() {
                       {rule.type === 'actuator' && `${translateCondition(rule.condition)} ${rule.value}`}
                       {rule.type === 'status' && `${translateCondition(rule.condition)} ${rule.value}`}
                     </Text>
+                    <Text style={styles.ruleLocation}>
+                      <Ionicons name={rule.locationScope === 'all' ? 'globe-outline' : 'location-outline'} size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
+                      {' '}{rule.locationScope === 'all' ? 'Todas las ubicaciones' : rule.specificLocation || 'Ubicación específica'}
+                    </Text>
                     <Text style={styles.ruleStatus}>
                       {rule.id.startsWith('custom_') ? (
                         <>
@@ -410,6 +461,18 @@ export default function NotificationsScreen() {
                         </>
                       )}
                     </Text>
+                    {rule.lastTriggered && (
+                      <Text style={styles.ruleLastTriggered}>
+                        <Ionicons name="time-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
+                        {' '}Última activación: {new Date(rule.lastTriggered).toLocaleString()}
+                      </Text>
+                    )}
+                    {rule.message && (
+                      <Text style={styles.ruleMessage}>
+                        <Ionicons name="chatbubble-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
+                        {' '}{rule.message}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.ruleActions}>
                     <Switch
@@ -423,7 +486,7 @@ export default function NotificationsScreen() {
                         style={styles.deleteButton}
                         onPress={() => deleteNotificationRule(rule.id)}
                       >
-                        <Text style={{ color: '#FF3B30', fontSize: 16 }}>🗑️</Text>
+                        <Ionicons name="trash-outline" size={16} color="#FF3B30" />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -467,6 +530,10 @@ export default function NotificationsScreen() {
                       {rule.type === 'actuator' && `${translateCondition(rule.condition)} ${rule.value}`}
                       {rule.type === 'status' && `${translateCondition(rule.condition)} ${rule.value}`}
                     </Text>
+                    <Text style={styles.ruleLocation}>
+                      <Ionicons name={rule.locationScope === 'all' ? 'globe-outline' : 'location-outline'} size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
+                      {' '}{rule.locationScope === 'all' ? 'Todas las ubicaciones' : rule.specificLocation || 'Ubicación específica'}
+                    </Text>
                     <Text style={styles.ruleStatus}>
                       {rule.id.startsWith('custom_') ? (
                         <>
@@ -480,6 +547,18 @@ export default function NotificationsScreen() {
                         </>
                       )}
                     </Text>
+                    {rule.lastTriggered && (
+                      <Text style={styles.ruleLastTriggered}>
+                        <Ionicons name="time-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
+                        {' '}Última activación: {new Date(rule.lastTriggered).toLocaleString()}
+                      </Text>
+                    )}
+                    {rule.message && (
+                      <Text style={styles.ruleMessage}>
+                        <Ionicons name="chatbubble-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
+                        {' '}{rule.message}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.ruleActions}>
                     <Switch

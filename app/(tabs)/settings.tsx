@@ -5,10 +5,13 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
+    Dimensions,
+    Modal,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -18,39 +21,29 @@ import { ProtectedRoute } from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import { sensorApi } from '../../services/sensorApi';
+import { notificationService } from '../../services/notificationService';
+import { userPreferencesApi } from '../../services/userPreferencesApi';
 
 export default function SettingsScreen() {
   const { isDark, themeMode, setThemeMode } = useTheme();
   const { user, logout } = useAuth();
   const permissions = usePermissions();
   
+  // Responsive design
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const isSmallScreen = screenWidth < 400;
+  const isVerySmallScreen = screenWidth < 350;
+  
   // Estados básicos
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [dataRetention, setDataRetention] = useState(30);
-  const [language, setLanguage] = useState('es');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showAdvancedExportModal, setShowAdvancedExportModal] = useState(false);
   
-  // Estados de notificaciones
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  // Estados para preferencias
+  const [preferredLocation, setPreferredLocation] = useState<string>('');
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   
-  // Estados de datos
-  const [autoSync, setAutoSync] = useState(true);
-  const [syncInterval, setSyncInterval] = useState(5); // minutos
-  
-  
-  // Estados de modales
-  const [showDataRetentionModal, setShowDataRetentionModal] = useState(false);
-  const [showSyncIntervalModal, setShowSyncIntervalModal] = useState(false);
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
-  const [showNotificationRulesModal, setShowNotificationRulesModal] = useState(false);
-  
-  // Estados temporales para modales
-  const [tempDataRetention, setTempDataRetention] = useState(30);
-  const [tempSyncInterval, setTempSyncInterval] = useState(5);
-  const [tempLanguage, setTempLanguage] = useState('es');
 
   // Cargar configuraciones guardadas
   useEffect(() => {
@@ -62,31 +55,30 @@ export default function SettingsScreen() {
       const settings = await AsyncStorage.getItem('app_settings');
       if (settings) {
         const parsedSettings = JSON.parse(settings);
-        setAutoRefresh(parsedSettings.autoRefresh ?? true);
-        setDataRetention(parsedSettings.dataRetention ?? 30);
-        setLanguage(parsedSettings.language ?? 'es');
-        setPushNotifications(parsedSettings.pushNotifications ?? true);
-        setSoundEnabled(parsedSettings.soundEnabled ?? true);
-        setVibrationEnabled(parsedSettings.vibrationEnabled ?? true);
-        setAutoSync(parsedSettings.autoSync ?? true);
-        setSyncInterval(parsedSettings.syncInterval ?? 5);
+        setPreferredLocation(parsedSettings.preferredLocation || '');
       }
+      
+      // Cargar ubicaciones disponibles
+      await loadAvailableLocations();
     } catch (error) {
       console.error('Error loading settings:', error);
+    }
+  };
+
+  const loadAvailableLocations = async () => {
+    try {
+      const allSensors = await sensorApi.getAllSensors();
+      const uniqueLocations = [...new Set(allSensors.map(sensor => sensor.ubicacion).filter(Boolean))] as string[];
+      setAvailableLocations(uniqueLocations);
+    } catch (error) {
+      console.error('Error loading locations:', error);
     }
   };
 
   const saveSettings = async () => {
     try {
       const settings = {
-        autoRefresh,
-        dataRetention,
-        language,
-        pushNotifications,
-        soundEnabled,
-        vibrationEnabled,
-        autoSync,
-        syncInterval,
+        preferredLocation: preferredLocation
       };
       await AsyncStorage.setItem('app_settings', JSON.stringify(settings));
     } catch (error) {
@@ -94,20 +86,59 @@ export default function SettingsScreen() {
     }
   };
 
-  // Guardar configuraciones cuando cambien
-  useEffect(() => {
-    saveSettings();
-  }, [
-    autoRefresh, dataRetention, language, pushNotifications,
-    soundEnabled, vibrationEnabled,
-    autoSync, syncInterval,
-  ]);
+  const savePreferencesToDatabase = async () => {
+    try {
+      if (!user?.id) {
+        Alert.alert('Error', 'Usuario no autenticado');
+        return;
+      }
+
+      // Obtener SOLO los datos reales que existen en el sistema
+      const notificationRules = notificationService.getNotificationRules();
+      
+      // Filtrar solo las notificaciones personalizadas (creadas por el usuario)
+      const customNotifications = notificationRules.filter(rule => rule.id.startsWith('custom_'));
+      
+      // Filtrar solo las notificaciones que están activadas
+      const activeNotifications = notificationRules.filter(rule => rule.enabled);
+
+      // Guardar SOLO los datos reales, sin inventar nada
+      const preferences = {
+        userId: user.id,
+        username: user.username,
+        email: user.email,
+        preferredLocation: preferredLocation || null, // Solo si existe, sino null
+        customNotifications: customNotifications, // Solo las que realmente existen
+        activeNotifications: activeNotifications, // Solo las que están activas
+        totalNotifications: notificationRules.length, // Contador real
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Llamada real a la API usando el servicio
+      const response = await userPreferencesApi.saveUserPreferences(preferences, user.token || '');
+
+      if (response.success) {
+        Alert.alert(
+          'Preferencias Guardadas', 
+          `Ubicación preferida: ${preferredLocation || 'Ninguna'}\n\nNotificaciones:\n• Personalizadas: ${customNotifications.length}\n• Activas: ${activeNotifications.length}\n• Total: ${notificationRules.length}\n\nGuardado en BD exitosamente!`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        throw new Error(response.message || 'Error en la respuesta del servidor');
+      }
+
+    } catch (error: any) {
+      console.error('Error saving preferences to database:', error);
+      Alert.alert('Error', `No se pudieron guardar las preferencias en la base de datos: ${error.message}`);
+    }
+  };
+
 
   const handleLogout = async () => {
     console.log(' handleLogout() llamada - Mostrando alerta de confirmación');
     
     try {
-      console.log('🔄 Creando alerta de confirmación...');
+      console.log('Creando alerta de confirmación...');
       
       Alert.alert(
         'Cerrar Sesión',
@@ -167,17 +198,6 @@ export default function SettingsScreen() {
   };
 
 
-  const getLanguageName = (code: string) => {
-    const languages: { [key: string]: string } = {
-      'es': 'Español',
-      'en': 'English',
-      'fr': 'Français',
-      'de': 'Deutsch',
-      'it': 'Italiano',
-      'pt': 'Português'
-    };
-    return languages[code] || 'Español';
-  };
 
   const styles = StyleSheet.create({
     container: {
@@ -185,21 +205,44 @@ export default function SettingsScreen() {
       backgroundColor: isDark ? '#000000' : '#FFFFFF',
     },
     header: {
-      padding: 20,
-      paddingTop: 60,
+      padding: 16,
+      paddingTop: 10,
       backgroundColor: 'transparent',
     },
-    headerTitle: {
-      fontSize: 34,
-      fontWeight: '700',
-      color: isDark ? '#FFFFFF' : '#000000',
-      marginBottom: 4,
-      letterSpacing: -0.5,
+    headerGlass: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      shadowColor: isDark ? '#000000' : '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    headerIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
     },
     headerSubtitle: {
-      fontSize: 17,
+      fontSize: 18,
+      fontWeight: '600',
       color: isDark ? '#FFFFFF' : '#000000',
-      fontWeight: '400',
+      flex: 1,
+      letterSpacing: -0.2,
     },
     scrollContent: {
       padding: 20,
@@ -347,6 +390,92 @@ export default function SettingsScreen() {
       color: isDark ? '#FFFFFF' : '#000000',
       fontWeight: '400',
     },
+    locationSelector: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+      borderRadius: 12,
+      padding: 12,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+    },
+    locationSelectorText: {
+      fontSize: 16,
+      color: isDark ? '#FFFFFF' : '#000000',
+      flex: 1,
+    },
+    locationSelectorPlaceholder: {
+      color: isDark ? '#8E8E93' : '#6D6D70',
+    },
+    savePreferencesButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#007AFF',
+      borderRadius: 12,
+      padding: 16,
+      marginTop: 16,
+      gap: 8,
+    },
+    savePreferencesButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalBackdrop: {
+      flex: 1,
+    },
+    modalContent: {
+      backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      maxHeight: '60%',
+      minHeight: '40%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: isDark ? '#FFFFFF' : '#000000',
+    },
+    modalCloseButton: {
+      padding: 4,
+    },
+    modalScrollView: {
+      flex: 1,
+    },
+    locationOption: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+    },
+    selectedLocationOption: {
+      backgroundColor: isDark ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)',
+    },
+    locationOptionContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    locationOptionText: {
+      fontSize: 16,
+      color: isDark ? '#FFFFFF' : '#000000',
+      marginLeft: 12,
+      flex: 1,
+    },
   });
 
   return (
@@ -354,10 +483,14 @@ export default function SettingsScreen() {
       <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Configuración</Text>
-        <Text style={styles.headerSubtitle}>
-          Personaliza tu experiencia
-        </Text>
+        <View style={styles.headerGlass}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerIconContainer}>
+              <Ionicons name="settings-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+            </View>
+            <Text style={styles.headerSubtitle}>Personaliza tu experiencia</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -374,7 +507,6 @@ export default function SettingsScreen() {
               </View>
               <Text style={styles.userName}>{user?.username || 'Cargando...'}</Text>
               <Text style={styles.userEmail}>{user?.email || 'Cargando...'}</Text>
-              <Text style={styles.userRole}>{user?.role || 'Cargando...'}</Text>
             </View>
           </View>
         </BlurView>
@@ -444,131 +576,47 @@ export default function SettingsScreen() {
           </View>
         </BlurView>
 
-        {/* Data & Sync */}
+
+
+
+
+        {/* Preferencias de Usuario */}
         <BlurView
           intensity={isDark ? 20 : 30}
           tint={isDark ? 'dark' : 'light'}
           style={styles.section}
         >
           <View style={styles.sectionContent}>
-            <Text style={styles.sectionTitle}>Datos y Sincronización</Text>
+            <Text style={styles.sectionTitle}>
+              <Ionicons name="person-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              {' '}Preferencias
+            </Text>
             
             <View style={styles.settingItem}>
-              <Text style={styles.settingLabel}>Actualización Automática</Text>
-              <Switch
-                value={autoRefresh}
-                onValueChange={setAutoRefresh}
-                trackColor={{ false: '#767577', true: isDark ? '#FFFFFF' : '#000000' }}
-                thumbColor={autoRefresh ? (isDark ? '#000000' : '#FFFFFF') : '#f4f3f4'}
-              />
+              <Text style={styles.settingLabel}>Ubicación Preferida</Text>
+              <TouchableOpacity
+                style={styles.locationSelector}
+                onPress={() => setShowLocationModal(true)}
+              >
+                <Text style={[
+                  styles.locationSelectorText,
+                  !preferredLocation && styles.locationSelectorPlaceholder
+                ]}>
+                  {preferredLocation || 'Seleccionar ubicación...'}
+                </Text>
+                <Ionicons name="chevron-down-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              </TouchableOpacity>
             </View>
-            
-            <View style={styles.settingItem}>
-              <Text style={styles.settingLabel}>Sincronización Automática</Text>
-              <Switch
-                value={autoSync}
-                onValueChange={setAutoSync}
-                trackColor={{ false: '#767577', true: isDark ? '#FFFFFF' : '#000000' }}
-                thumbColor={autoSync ? (isDark ? '#000000' : '#FFFFFF') : '#f4f3f4'}
-              />
-            </View>
-            
+
             <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => {
-                setTempSyncInterval(syncInterval);
-                setShowSyncIntervalModal(true);
-              }}
+              style={styles.savePreferencesButton}
+              onPress={savePreferencesToDatabase}
             >
-              <Text style={styles.settingLabel}>Intervalo de Sincronización</Text>
-              <Text style={styles.settingValue}>{syncInterval} min</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => {
-                setTempDataRetention(dataRetention);
-                setShowDataRetentionModal(true);
-              }}
-            >
-              <Text style={styles.settingLabel}>Retención de Datos</Text>
-              <Text style={styles.settingValue}>{dataRetention} días</Text>
-            </TouchableOpacity>
-            
-            
-            <TouchableOpacity 
-              style={[styles.settingItem, styles.settingItemLast]}
-              onPress={() => {
-                setTempLanguage(language);
-                setShowLanguageModal(true);
-              }}
-            >
-              <Text style={styles.settingLabel}>Idioma</Text>
-              <Text style={styles.settingValue}>{getLanguageName(language)}</Text>
+              <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.savePreferencesButtonText}>Guardar Preferencias en BD</Text>
             </TouchableOpacity>
           </View>
         </BlurView>
-
-        {/* Notifications */}
-        <BlurView
-          intensity={isDark ? 20 : 30}
-          tint={isDark ? 'dark' : 'light'}
-          style={styles.section}
-        >
-          <View style={styles.sectionContent}>
-            <Text style={styles.sectionTitle}>Notificaciones</Text>
-            
-            <View style={styles.settingItem}>
-              <Text style={styles.settingLabel}>Notificaciones Push</Text>
-              <Switch
-                value={pushNotifications}
-                onValueChange={setPushNotifications}
-                trackColor={{ false: '#767577', true: isDark ? '#FFFFFF' : '#000000' }}
-                thumbColor={pushNotifications ? (isDark ? '#000000' : '#FFFFFF') : '#f4f3f4'}
-              />
-            </View>
-            
-            
-            <View style={styles.settingItem}>
-              <Text style={styles.settingLabel}>Sonido</Text>
-              <Switch
-                value={soundEnabled}
-                onValueChange={setSoundEnabled}
-                trackColor={{ false: '#767577', true: isDark ? '#FFFFFF' : '#000000' }}
-                thumbColor={soundEnabled ? (isDark ? '#000000' : '#FFFFFF') : '#f4f3f4'}
-              />
-            </View>
-            
-            <View style={[styles.settingItem, styles.settingItemLast]}>
-              <Text style={styles.settingLabel}>Vibración</Text>
-              <Switch
-                value={vibrationEnabled}
-                onValueChange={setVibrationEnabled}
-                trackColor={{ false: '#767577', true: isDark ? '#FFFFFF' : '#000000' }}
-                thumbColor={vibrationEnabled ? (isDark ? '#000000' : '#FFFFFF') : '#f4f3f4'}
-              />
-            </View>
-            
-          </View>
-        </BlurView>
-
-
-        {/* Información de permisos para usuarios */}
-        {user?.role === 'user' && (
-          <BlurView
-            intensity={isDark ? 20 : 30}
-            tint={isDark ? 'dark' : 'light'}
-            style={styles.section}
-          >
-            <View style={styles.sectionContent}>
-              <Text style={styles.sectionTitle}>Información de Usuario</Text>
-              <Text style={[styles.settingLabel, { textAlign: 'center', marginBottom: 0 }]}>
-                Como usuario estándar, tienes acceso a las funciones básicas de monitoreo. 
-                Para acceder a configuraciones avanzadas del sistema, contacta a un administrador.
-              </Text>
-            </View>
-          </BlurView>
-        )}
 
         {/* Exportación de Datos */}
         <BlurView
@@ -617,13 +665,13 @@ export default function SettingsScreen() {
               onPress={() => {
                 Alert.alert(
                   'SensorSP - Información',
-                  '🌡️ Aplicación de Monitoreo IoT\n\n' +
+                  'Aplicación de Monitoreo IoT\n\n' +
                   ' Versión: 2025.1.0\n' +
-                  '🏗️ Plataforma: React Native + Expo\n' +
-                  '📅 Última actualización: Enero 2025\n\n' +
-                  '👨‍💻 Desarrollado por: Yonsn76\n' +
-                  '📧 Contacto: yonsn76@example.com\n\n' +
-                  '🔧 Funcionalidades:\n' +
+                  'Plataforma: React Native + Expo\n' +
+                  'Última actualización: Enero 2025\n\n' +
+                  'Desarrollado por: Yonsn76\n' +
+                  'Contacto: yonsn76@example.com\n\n' +
+                  'Funcionalidades:\n' +
                   '• Monitoreo en tiempo real\n' +
                   '• Alertas inteligentes\n' +
                   '• Exportación de datos\n' +
@@ -721,6 +769,7 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
 
+
       {/* Export Modal */}
       <ExportModal
         visible={showExportModal}
@@ -732,6 +781,92 @@ export default function SettingsScreen() {
         visible={showAdvancedExportModal}
         onClose={() => setShowAdvancedExportModal(false)}
       />
+
+      {/* Modal para seleccionar ubicación */}
+      <Modal
+        visible={showLocationModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={() => setShowLocationModal(false)}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Seleccionar Ubicación Preferida</Text>
+              <TouchableOpacity 
+                onPress={() => setShowLocationModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalScrollView}>
+              <TouchableOpacity
+                style={[
+                  styles.locationOption,
+                  !preferredLocation && styles.selectedLocationOption
+                ]}
+                onPress={() => {
+                  setPreferredLocation('');
+                  setShowLocationModal(false);
+                }}
+              >
+                <View style={styles.locationOptionContent}>
+                  <Ionicons 
+                    name="globe-outline" 
+                    size={20} 
+                    color={isDark ? '#FFFFFF' : '#000000'} 
+                  />
+                  <Text style={styles.locationOptionText}>Sin preferencia</Text>
+                  {!preferredLocation && (
+                    <Ionicons 
+                      name="checkmark-circle" 
+                      size={24} 
+                      color="#007AFF" 
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              {availableLocations.map((location) => (
+                <TouchableOpacity
+                  key={location}
+                  style={[
+                    styles.locationOption,
+                    preferredLocation === location && styles.selectedLocationOption
+                  ]}
+                  onPress={() => {
+                    setPreferredLocation(location);
+                    setShowLocationModal(false);
+                  }}
+                >
+                  <View style={styles.locationOptionContent}>
+                    <Ionicons 
+                      name="location-outline" 
+                      size={20} 
+                      color={isDark ? '#FFFFFF' : '#000000'} 
+                    />
+                    <Text style={styles.locationOptionText}>{location}</Text>
+                    {preferredLocation === location && (
+                      <Ionicons 
+                        name="checkmark-circle" 
+                        size={24} 
+                        color="#007AFF" 
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       </View>
     </ProtectedRoute>
   );

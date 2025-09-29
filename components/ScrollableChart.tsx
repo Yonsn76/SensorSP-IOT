@@ -30,19 +30,27 @@ export default function ScrollableChart({
       return chartWidth;
     }
     
+    // Siempre asegurar un ancho mínimo para scroll
+    const baseWidth = Math.max(minWidth, screenWidth - 80);
+    
     if (dataLength > maxVisiblePoints) {
       // Si hay más datos que puntos visibles, expandir el ancho
       const pointsPerScreen = maxVisiblePoints;
       const totalPoints = dataLength;
       const expansionFactor = Math.ceil(totalPoints / pointsPerScreen);
-      return minWidth * expansionFactor;
+      return baseWidth * expansionFactor;
     }
     
-    return minWidth;
+    // Para pocos datos, usar un ancho que permita scroll suave
+    if (dataLength > 1) {
+      return baseWidth * 1.2; // 20% más ancho para permitir scroll mínimo
+    }
+    
+    return baseWidth;
   };
 
   const requiredWidth = calculateRequiredWidth();
-  const needsScroll = requiredWidth > screenWidth - 80; // Margen para el contenedor
+  const needsScroll = dataLength > 1; // Mostrar scroll si hay más de 1 punto de datos
 
   const handleContentSizeChange = (contentWidth: number, contentHeight: number) => {
     setContentWidth(Math.max(contentWidth, requiredWidth));

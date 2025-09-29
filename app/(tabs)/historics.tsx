@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import {
   Dimensions,
@@ -8,6 +9,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import CustomDateRangeSelector, { DateRange } from '../../components/CustomDateRangeSelector';
@@ -17,6 +20,7 @@ import TimeRangeSelector, { TimeRange } from '../../components/TimeRangeSelector
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { sensorApi } from '../../services/sensorApi';
+import { userPreferencesApi } from '../../services/userPreferencesApi';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -31,6 +35,39 @@ export default function HistoricsScreen() {
   const [showTimeRangeSelector, setShowTimeRangeSelector] = useState(false);
   const [showCustomDateSelector, setShowCustomDateSelector] = useState(false);
   const [customDateRange, setCustomDateRange] = useState<DateRange | null>(null);
+  const [selectedSensor, setSelectedSensor] = useState<any>(null);
+  const [uniqueSensors, setUniqueSensors] = useState<any[]>([]);
+  const [showSensorModal, setShowSensorModal] = useState(false);
+
+  const loadPreferredLocationAndSetSensor = async (uniqueSensorsArray: any[]) => {
+    try {
+      if (!user?.id || !user?.token) return;
+      
+      // Load preferred location from API
+      const preferredLocation = await userPreferencesApi.getPreferredLocation(user.id, user.token);
+      
+      if (preferredLocation) {
+        // Find sensor with preferred location
+        const preferredSensor = uniqueSensorsArray.find(sensor => sensor.ubicacion === preferredLocation);
+        if (preferredSensor) {
+          setSelectedSensor(preferredSensor);
+          console.log(`Using preferred location in historics: ${preferredLocation}`);
+          return;
+        }
+      }
+      
+      // Fallback to default logic if no preferred location or sensor not found
+      if (!selectedSensor && uniqueSensorsArray.length > 0) {
+        setSelectedSensor(uniqueSensorsArray[0]);
+      }
+    } catch (error) {
+      console.error('Error loading preferred location in historics:', error);
+      // Fallback to default logic
+      if (!selectedSensor && uniqueSensorsArray.length > 0) {
+        setSelectedSensor(uniqueSensorsArray[0]);
+      }
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -62,11 +99,61 @@ export default function HistoricsScreen() {
       }
       
       setSensorData(data);
+      
+      // Load unique sensors for selector
+      const allSensors = await sensorApi.getAllSensors();
+      const uniqueSensorMap = new Map<string, any>();
+      allSensors.forEach((sensor: any) => {
+        if (sensor.sensorId && !uniqueSensorMap.has(sensor.sensorId)) {
+          uniqueSensorMap.set(sensor.sensorId, sensor);
+        }
+      });
+      const uniqueSensorsArray = Array.from(uniqueSensorMap.values());
+      setUniqueSensors(uniqueSensorsArray);
+      
+      // Load preferred location and set selected sensor
+      await loadPreferredLocationAndSetSensor(uniqueSensorsArray);
+      
       console.log('Historical data loaded successfully');
     } catch (error) {
       console.error('Error loading historical data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSelectedSensorData = async (sensor: any) => {
+    try {
+      console.log('Loading historical data for sensor:', sensor.sensorId);
+      
+      // Load data based on selected time range for specific sensor
+      let data: Array<{ fecha: string; temperatura: number; humedad: number }>;
+      
+      switch (selectedTimeRange) {
+        case 'today':
+          data = await sensorApi.getTodayDataBySensorId(sensor.sensorId);
+          break;
+        case 'week':
+          data = await sensorApi.getWeeklyDataBySensorId(sensor.sensorId);
+          break;
+        case 'month':
+          data = await sensorApi.getMonthlyDataBySensorId(sensor.sensorId);
+          break;
+        case 'custom':
+          if (customDateRange) {
+            data = await sensorApi.getCustomRangeDataBySensorId(sensor.sensorId, customDateRange.startDate, customDateRange.endDate);
+          } else {
+            data = await sensorApi.getWeeklyDataBySensorId(sensor.sensorId);
+          }
+          break;
+        default:
+          data = await sensorApi.getTodayDataBySensorId(sensor.sensorId);
+      }
+      
+      setSensorData(data);
+      
+    } catch (error) {
+      console.error('Error loading selected sensor historical data:', error);
     }
   };
 
@@ -79,6 +166,12 @@ export default function HistoricsScreen() {
   useEffect(() => {
     loadData();
   }, [selectedTimeRange, customDateRange]);
+
+  useEffect(() => {
+    if (selectedSensor) {
+      loadSelectedSensorData(selectedSensor);
+    }
+  }, [selectedSensor]);
 
   // LineChart - Serie temporal de temperatura
   const getTemperatureTimeSeries = () => {
@@ -273,21 +366,44 @@ export default function HistoricsScreen() {
       backgroundColor: isDark ? '#000000' : '#F2F2F7',
     },
     header: {
-      padding: 20,
-      paddingTop: 60,
+      padding: 16,
+      paddingTop: 10,
       backgroundColor: 'transparent',
     },
-    headerTitle: {
-      fontSize: 34,
-      fontWeight: '700',
-      color: isDark ? '#FFFFFF' : '#1D1D1F',
-      marginBottom: 4,
-      letterSpacing: -0.5,
+    headerGlass: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      shadowColor: isDark ? '#000000' : '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
     },
-    headerSubtitle: {
-      fontSize: 17,
-      color: isDark ? '#8E8E93' : '#6D6D70',
-      fontWeight: '400',
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    headerIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: isDark ? '#FFFFFF' : '#000000',
+      flex: 1,
+      letterSpacing: -0.2,
     },
     scrollContent: {
       padding: 20,
@@ -357,14 +473,91 @@ export default function HistoricsScreen() {
       justifyContent: 'center',
       width: '100%',
     },
+    sensorSelectorContainer: {
+      alignItems: 'center',
+      marginVertical: 16,
+    },
+    sensorSelectorButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+      gap: 8,
+    },
+    sensorSelectorText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: isDark ? '#FFFFFF' : '#000000',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalBackdrop: {
+      flex: 1,
+    },
+    modalContent: {
+      backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      maxHeight: '60%',
+      minHeight: '40%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: isDark ? '#FFFFFF' : '#000000',
+    },
+    modalCloseButton: {
+      padding: 4,
+    },
+    sensorOption: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+    },
+    selectedSensorOption: {
+      backgroundColor: isDark ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)',
+    },
+    sensorOptionContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    sensorOptionInfo: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    sensorOptionLocation: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: isDark ? '#FFFFFF' : '#000000',
+    },
+    sensorOptionId: {
+      fontSize: 14,
+      color: isDark ? '#8E8E93' : '#6D6D70',
+      marginTop: 2,
+    },
   });
 
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Históricos</Text>
-          <Text style={styles.headerSubtitle}>Análisis detallado de datos</Text>
+          <Text style={styles.headerTitle}>Análisis detallado de datos</Text>
         </View>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Cargando análisis histórico...</Text>
@@ -378,22 +571,38 @@ export default function HistoricsScreen() {
       <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text style={styles.headerTitle}>Históricos</Text>
-            <Text style={styles.headerSubtitle}>Análisis detallado de datos</Text>
+        <View style={styles.headerGlass}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerIconContainer}>
+              <Ionicons name="analytics-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+            </View>
+            <Text style={styles.headerTitle}>Análisis detallado de datos</Text>
+            <TouchableOpacity
+              style={styles.timeRangeButton}
+              onPress={() => setShowTimeRangeSelector(true)}
+            >
+              <Ionicons name="time-outline" size={18} color={isDark ? '#FFFFFF' : '#1D1D1F'} />
+              <Text style={styles.timeRangeButtonText}>
+                {getTimeRangeLabel(selectedTimeRange)}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.timeRangeButton}
-            onPress={() => setShowTimeRangeSelector(true)}
-          >
-            <Ionicons name="time-outline" size={20} color={isDark ? '#FFFFFF' : '#1D1D1F'} />
-            <Text style={styles.timeRangeButtonText}>
-              {getTimeRangeLabel(selectedTimeRange)}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
+
+      {/* Sensor Selector Button */}
+      {selectedSensor && uniqueSensors.length > 1 && (
+        <View style={styles.sensorSelectorContainer}>
+          <TouchableOpacity
+            style={styles.sensorSelectorButton}
+            onPress={() => setShowSensorModal(true)}
+          >
+            <Ionicons name="hardware-chip-outline" size={16} color={isDark ? '#FFFFFF' : '#000000'} />
+            <Text style={styles.sensorSelectorText}>{selectedSensor.sensorId}</Text>
+            <Ionicons name="chevron-down-outline" size={14} color={isDark ? '#FFFFFF' : '#000000'} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView 
         style={styles.scrollContent} 
@@ -416,11 +625,11 @@ export default function HistoricsScreen() {
               <ScrollableChart 
                 dataLength={sensorData.length}
                 maxVisiblePoints={8}
-                chartWidth={Math.max(screenWidth - 80, sensorData.length * 50)}
+                chartWidth={Math.max(screenWidth - 80, Math.max(sensorData.length * 50, (screenWidth - 80) * 1.2))}
               >
                 <LineChart
                   data={getTemperatureTimeSeries()}
-                  width={Math.max(screenWidth - 80, sensorData.length * 50)}
+                  width={Math.max(screenWidth - 80, Math.max(sensorData.length * 50, (screenWidth - 80) * 1.2))}
                   height={220}
                   chartConfig={getChartConfig()}
                   bezier
@@ -450,11 +659,11 @@ export default function HistoricsScreen() {
                <ScrollableChart 
                  dataLength={getHourlyTrends().labels.length}
                  maxVisiblePoints={screenWidth < 400 ? 6 : 8}
-                 chartWidth={Math.max(screenWidth - 80, getHourlyTrends().labels.length * (screenWidth < 400 ? 50 : 40))}
+                 chartWidth={Math.max(screenWidth - 80, Math.max(getHourlyTrends().labels.length * (screenWidth < 400 ? 50 : 40), (screenWidth - 80) * 1.2))}
                >
                  <BarChart
                    data={getHourlyTrends()}
-                   width={Math.max(screenWidth - 80, getHourlyTrends().labels.length * (screenWidth < 400 ? 50 : 40))}
+                   width={Math.max(screenWidth - 80, Math.max(getHourlyTrends().labels.length * (screenWidth < 400 ? 50 : 40), (screenWidth - 80) * 1.2))}
                    height={220}
                    chartConfig={getChartConfig()}
                    yAxisLabel=""
@@ -514,11 +723,11 @@ export default function HistoricsScreen() {
                <ScrollableChart 
                  dataLength={sensorData.length}
                  maxVisiblePoints={10}
-                 chartWidth={Math.max(screenWidth - 80, sensorData.length * 45)}
+                 chartWidth={Math.max(screenWidth - 80, Math.max(sensorData.length * 45, (screenWidth - 80) * 1.2))}
                >
                  <LineChart
                    data={getVariabilityAnalysis()}
-                   width={Math.max(screenWidth - 80, sensorData.length * 45)}
+                   width={Math.max(screenWidth - 80, Math.max(sensorData.length * 45, (screenWidth - 80) * 1.2))}
                    height={220}
                    chartConfig={getChartConfig()}
                    bezier
@@ -548,11 +757,11 @@ export default function HistoricsScreen() {
                <ScrollableChart 
                  dataLength={getEfficiencyAnalysis().labels.length}
                  maxVisiblePoints={screenWidth < 400 ? 3 : 6}
-                 chartWidth={Math.max(screenWidth - 80, getEfficiencyAnalysis().labels.length * (screenWidth < 400 ? 80 : 60))}
+                 chartWidth={Math.max(screenWidth - 80, Math.max(getEfficiencyAnalysis().labels.length * (screenWidth < 400 ? 80 : 60), (screenWidth - 80) * 1.2))}
                >
                  <BarChart
                    data={getEfficiencyAnalysis()}
-                   width={Math.max(screenWidth - 80, getEfficiencyAnalysis().labels.length * (screenWidth < 400 ? 80 : 60))}
+                   width={Math.max(screenWidth - 80, Math.max(getEfficiencyAnalysis().labels.length * (screenWidth < 400 ? 80 : 60), (screenWidth - 80) * 1.2))}
                    height={220}
                    chartConfig={getChartConfig()}
                    yAxisLabel=""
@@ -584,6 +793,70 @@ export default function HistoricsScreen() {
         onClose={() => setShowCustomDateSelector(false)}
         onSelectRange={handleCustomDateRangeSelect}
       />
+
+      {/* Sensor Selection Modal */}
+      <Modal
+        visible={showSensorModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowSensorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={() => setShowSensorModal(false)}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Seleccionar Sensor</Text>
+              <TouchableOpacity 
+                onPress={() => setShowSensorModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+              </TouchableOpacity>
+            </View>
+            
+            <FlatList
+              data={uniqueSensors}
+              keyExtractor={(item) => item.sensorId || item._id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.sensorOption,
+                    selectedSensor?.sensorId === item.sensorId && styles.selectedSensorOption
+                  ]}
+                  onPress={() => {
+                    setSelectedSensor(item);
+                    setShowSensorModal(false);
+                  }}
+                >
+                  <View style={styles.sensorOptionContent}>
+                    <Ionicons 
+                      name="location-outline" 
+                      size={20} 
+                      color={isDark ? '#FFFFFF' : '#000000'} 
+                    />
+                    <View style={styles.sensorOptionInfo}>
+                      <Text style={styles.sensorOptionLocation}>{item.ubicacion}</Text>
+                      <Text style={styles.sensorOptionId}>ID: {item.sensorId}</Text>
+                    </View>
+                    {selectedSensor?.sensorId === item.sensorId && (
+                      <Ionicons 
+                        name="checkmark-circle" 
+                        size={24} 
+                        color="#007AFF" 
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </View>
+      </Modal>
       </View>
     </ProtectedRoute>
   );

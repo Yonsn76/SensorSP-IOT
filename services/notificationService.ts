@@ -49,9 +49,8 @@ export interface NotificationRule {
   condition: 'mayor_que' | 'menor_que' | 'igual_a' | 'cambia_a';
   value: number | string;
   message: string;
-  priority: 'low' | 'normal' | 'high' | 'critical';
-  sound: 'default' | 'alert' | 'critical' | 'none';
-  vibration: boolean;
+  locationScope?: 'all' | 'specific';
+  specificLocation?: string;
   createdAt?: string;
   lastTriggered?: string;
 }
@@ -81,10 +80,7 @@ export class NotificationService {
       type: 'temperature',
       condition: 'mayor_que',
       value: 40,
-      message: '🌡️ Temperatura crítica: {value}°C. Activar ventilación.',
-      priority: 'high',
-      sound: 'default',
-      vibration: true,
+      message: 'Temperatura crítica: {value}°C. Activar ventilación.',
     },
     {
       id: 'temp_low',
@@ -93,10 +89,7 @@ export class NotificationService {
       type: 'temperature',
       condition: 'menor_que',
       value: 0,
-      message: '🧊 Temperatura muy baja: {value}°C. Activar calefacción.',
-      priority: 'high',
-      sound: 'default',
-      vibration: true,
+      message: 'Temperatura muy baja: {value}°C. Activar calefacción.',
     },
     {
       id: 'humidity_high',
@@ -105,10 +98,7 @@ export class NotificationService {
       type: 'humidity',
       condition: 'mayor_que',
       value: 80,
-      message: '💧 Humedad alta: {value}%. Verificar sistema.',
-      priority: 'normal',
-      sound: 'default',
-      vibration: true,
+      message: 'Humedad alta: {value}%. Verificar sistema.',
     },
     {
       id: 'actuator_ventilador',
@@ -117,10 +107,7 @@ export class NotificationService {
       type: 'actuator',
       condition: 'igual_a',
       value: 'ventilador',
-      message: '🌀 Ventilador activado. Temperatura: {temp}°C',
-      priority: 'normal',
-      sound: 'default',
-      vibration: true,
+      message: 'Ventilador activado. Temperatura: {temp}°C',
     },
     {
       id: 'actuator_calefactor',
@@ -129,10 +116,7 @@ export class NotificationService {
       type: 'actuator',
       condition: 'igual_a',
       value: 'calefactor',
-      message: '🔥 Calefactor activado. Temperatura: {temp}°C',
-      priority: 'normal',
-      sound: 'default',
-      vibration: true,
+      message: 'Calefactor activado. Temperatura: {temp}°C',
     },
     {
       id: 'status_caliente',
@@ -141,10 +125,7 @@ export class NotificationService {
       type: 'status',
       condition: 'igual_a',
       value: 'caliente',
-      message: '🌡️ Sistema en estado caliente. Revisar condiciones.',
-      priority: 'normal',
-      sound: 'default',
-      vibration: true,
+      message: 'Sistema en estado caliente. Revisar condiciones.',
     },
     {
       id: 'status_frio',
@@ -153,10 +134,7 @@ export class NotificationService {
       type: 'status',
       condition: 'igual_a',
       value: 'frio',
-      message: '❄️ Sistema en estado frío. Revisar condiciones.',
-      priority: 'normal',
-      sound: 'default',
-      vibration: true,
+      message: 'Sistema en estado frío. Revisar condiciones.',
     },
   ];
 
@@ -272,79 +250,6 @@ export class NotificationService {
     }
   }
 
-  checkSensorData(sensorData: SensorData): void {
-    this.notificationRules.forEach(rule => {
-      if (!rule.enabled) return;
-
-      const shouldNotify = this.evaluateRule(rule, sensorData);
-      if (shouldNotify) {
-        this.sendNotificationForRule(rule, sensorData);
-      }
-    });
-  }
-
-  private evaluateRule(rule: NotificationRule, sensorData: SensorData): boolean {
-    // Sin cooldown - evaluar inmediatamente si se cumple la condición
-    switch (rule.type) {
-      case 'temperature':
-        return this.evaluateTemperatureRule(rule, sensorData.temperatura);
-      case 'humidity':
-        return this.evaluateHumidityRule(rule, sensorData.humedad);
-      case 'actuator':
-        return this.evaluateActuatorRule(rule, sensorData.actuador);
-      case 'status':
-        return this.evaluateStatusRule(rule, sensorData.estado);
-      default:
-        return false;
-    }
-  }
-
-  private evaluateTemperatureRule(rule: NotificationRule, temperature: number): boolean {
-    switch (rule.condition) {
-      case 'mayor_que':
-        return temperature > (rule.value as number);
-      case 'menor_que':
-        return temperature < (rule.value as number);
-      default:
-        return false;
-    }
-  }
-
-  private evaluateHumidityRule(rule: NotificationRule, humidity: number): boolean {
-    switch (rule.condition) {
-      case 'mayor_que':
-        return humidity > (rule.value as number);
-      case 'menor_que':
-        return humidity < (rule.value as number);
-      default:
-        return false;
-    }
-  }
-
-  private evaluateActuatorRule(rule: NotificationRule, actuator: string): boolean {
-    return rule.condition === 'igual_a' && actuator === rule.value;
-  }
-
-  private evaluateStatusRule(rule: NotificationRule, status: string): boolean {
-    return rule.condition === 'igual_a' && status === rule.value;
-  }
-
-  private async sendNotificationForRule(rule: NotificationRule, sensorData: SensorData): Promise<void> {
-    const message = this.formatMessage(rule.message, sensorData);
-    
-    await this.scheduleNotification(
-      `IoT Alert: ${rule.name}`,
-      message,
-      {
-        ruleId: rule.id,
-        sensorData,
-        timestamp: new Date().toISOString(),
-      }
-    );
-
-    // Sin cooldown - no actualizar tiempo de última notificación
-    console.log(`🔔 Notificación enviada inmediatamente: ${rule.name}`);
-  }
 
   private formatMessage(template: string, sensorData: SensorData): string {
     return template
@@ -374,7 +279,7 @@ export class NotificationService {
 
   removeNotificationRule(ruleId: string): void {
     this.notificationRules = this.notificationRules.filter(rule => rule.id !== ruleId);
-    console.log(`🗑️ Regla de notificación eliminada: ${ruleId}`);
+    console.log(`Regla de notificación eliminada: ${ruleId}`);
   }
 
   async getNotificationHistory(): Promise<any[]> {
@@ -393,6 +298,20 @@ export class NotificationService {
     }
   }
 
+
+  private getDefaultMessage(rule: NotificationRule, value: any, location: string): string {
+    const type = rule.type === 'temperature' ? 'Temperatura' : 
+                 rule.type === 'humidity' ? 'Humedad' : 
+                 rule.type === 'actuator' ? 'Actuador' : 'Estado';
+    
+    const condition = rule.condition === 'mayor_que' ? 'superó' :
+                     rule.condition === 'menor_que' ? 'bajó de' :
+                     rule.condition === 'igual_a' ? 'es igual a' : 'cambió a';
+    
+    return `${type} ${condition} ${value} en ${location}. ${rule.message}`;
+  }
+
+
   async clearAllNotifications(): Promise<void> {
     // Si estamos en Expo Go o web, solo mostrar mensaje
     if (isExpoGo || isWeb || !isDevelopmentBuild || !Notifications) {
@@ -402,9 +321,79 @@ export class NotificationService {
 
     try {
       await Notifications.dismissAllNotificationsAsync();
-      console.log('🗑️ Todas las notificaciones eliminadas');
+      console.log('Todas las notificaciones eliminadas');
     } catch (error) {
       console.error('  Error al eliminar notificaciones:', error);
+    }
+  }
+
+  async checkSensorData(sensorData: SensorData): Promise<void> {
+    try {
+      const enabledRules = this.notificationRules.filter(rule => rule.enabled);
+      
+      for (const rule of enabledRules) {
+        // Verificar si la regla aplica a esta ubicación
+        if (rule.locationScope === 'specific' && rule.specificLocation !== sensorData.ubicacion) {
+          continue; // Saltar si la regla es para una ubicación específica diferente
+        }
+
+        let shouldTrigger = false;
+        let triggerValue: string | number = '';
+
+        // Evaluar la condición según el tipo
+        switch (rule.type) {
+          case 'temperature':
+            triggerValue = sensorData.temperatura;
+            shouldTrigger = this.evaluateCondition(rule.condition, sensorData.temperatura, rule.value);
+            break;
+          case 'humidity':
+            triggerValue = sensorData.humedad;
+            shouldTrigger = this.evaluateCondition(rule.condition, sensorData.humedad, rule.value);
+            break;
+          case 'actuator':
+            triggerValue = sensorData.actuador;
+            shouldTrigger = this.evaluateCondition(rule.condition, sensorData.actuador, rule.value);
+            break;
+          case 'status':
+            triggerValue = sensorData.estado;
+            shouldTrigger = this.evaluateCondition(rule.condition, sensorData.estado, rule.value);
+            break;
+        }
+
+        if (shouldTrigger) {
+          const title = rule.name;
+          const body = rule.message || this.getDefaultMessage(rule, triggerValue, sensorData.ubicacion || 'Ubicación desconocida');
+          
+          await this.scheduleNotification(title, body, {
+            ruleId: rule.id,
+            sensorId: sensorData.sensorId,
+            location: sensorData.ubicacion || 'Ubicación desconocida',
+            value: triggerValue,
+            timestamp: new Date().toISOString()
+          });
+
+          // Actualizar última vez que se activó
+          rule.lastTriggered = new Date().toISOString();
+          console.log(`Notificación activada: ${rule.name} en ${sensorData.ubicacion || 'Ubicación desconocida'}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error al verificar datos del sensor:', error);
+    }
+  }
+
+  private evaluateCondition(condition: string, actualValue: any, targetValue: any): boolean {
+    switch (condition) {
+      case 'mayor_que':
+        return Number(actualValue) > Number(targetValue);
+      case 'menor_que':
+        return Number(actualValue) < Number(targetValue);
+      case 'igual_a':
+        return actualValue === targetValue || Number(actualValue) === Number(targetValue);
+      case 'cambia_a':
+        return actualValue === targetValue;
+      default:
+        return false;
     }
   }
 }

@@ -114,7 +114,7 @@ class ExportService {
       
       // Recopilar datos de sensores
       if (options.includeSensors) {
-        console.log('📊 Recopilando datos de sensores...');
+        console.log('Recopilando datos de sensores...');
         try {
           let sensorData: SensorData[] = [];
           
@@ -170,7 +170,7 @@ class ExportService {
 
       // Recopilar datos de notificaciones
       if (options.includeNotifications) {
-        console.log('🔔 Recopilando datos de notificaciones...');
+        console.log('Recopilando datos de notificaciones...');
         try {
           data.notifications.rules = await notificationService.getNotificationRules();
           data.notifications.history = await notificationService.getNotificationHistory();
@@ -185,7 +185,7 @@ class ExportService {
 
       // Recopilar configuraciones
       if (options.includeSettings) {
-        console.log('⚙️ Recopilando configuraciones...');
+        console.log('Recopilando configuraciones...');
         try {
           const theme = await AsyncStorage.getItem('theme-preference');
           const user = await AsyncStorage.getItem('iot-dashboard-user');
@@ -343,7 +343,7 @@ class ExportService {
       </head>
       <body>
         <div class="header">
-          <h1>📊 Reporte IoT Dashboard</h1>
+          <h1>Reporte IoT Dashboard</h1>
           <p>Generado el ${new Date(data.exportInfo.date).toLocaleString()}</p>
           <p>Plataforma: ${data.exportInfo.platform} | Versión: ${data.exportInfo.version}</p>
         </div>
@@ -376,7 +376,7 @@ class ExportService {
 
         ${data.sensors.length > 0 ? `
         <div class="section">
-          <h2>🌡️ Datos de Sensores (${data.sensors.length} registros)</h2>
+          <h2>Datos de Sensores (${data.sensors.length} registros)</h2>
           <table>
             <thead>
               <tr>
@@ -405,7 +405,7 @@ class ExportService {
 
         ${data.notifications.rules.length > 0 ? `
         <div class="section">
-          <h2>🔔 Reglas de Notificación (${data.notifications.rules.length} reglas)</h2>
+          <h2>Reglas de Notificación (${data.notifications.rules.length} reglas)</h2>
           <table>
             <thead>
               <tr>
@@ -459,7 +459,7 @@ class ExportService {
         ` : ''}
 
         <div class="section">
-          <h2>⚙️ Configuración</h2>
+          <h2>Configuración</h2>
           <div class="info">
             <p><strong>Tema:</strong> ${data.settings.theme}</p>
             <p><strong>Usuario:</strong> ${data.settings.user ? data.settings.user.username : 'No configurado'}</p>

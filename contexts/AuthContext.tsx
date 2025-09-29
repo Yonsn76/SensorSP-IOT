@@ -8,6 +8,7 @@ export interface User {
   username: string;
   email: string;
   createdAt: string;
+  token?: string;
 }
 
 export interface LoginCredentials {
@@ -143,7 +144,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Si hay datos de autenticación guardados, restaurar la sesión
           if (authData.user) {
             console.log('🔍 Restaurando sesión desde almacenamiento');
-            dispatch({ type: 'RESTORE_SESSION', payload: authData.user });
+            // Incluir el token en el usuario si está disponible
+            const userWithToken = {
+              ...authData.user,
+              token: authData.token || null
+            };
+            dispatch({ type: 'RESTORE_SESSION', payload: userWithToken });
           } else {
             console.log('🔍 No hay datos de usuario válidos');
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -196,6 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             username: userData.username || userData.email?.split('@')[0] || 'usuario',
             email: userData.email || credentials.email,
             createdAt: userData.createdAt || new Date().toISOString(),
+            token: response.data.token || null,
           };
 
           // Guardar también el token JWT si está disponible
@@ -274,6 +281,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             username: userData.username || credentials.username,
             email: userData.email || credentials.email,
             createdAt: userData.createdAt || new Date().toISOString(),
+            token: response.data.token || null,
           };
 
           // Guardar también el token JWT si está disponible

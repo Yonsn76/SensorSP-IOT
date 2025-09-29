@@ -20,10 +20,19 @@ export default function BlurTabBarBackground() {
             backgroundColor: isDark 
               ? 'rgba(0, 0, 0, 0.95)' 
               : 'rgba(255, 255, 255, 0.98)',
-            borderTopWidth: 0.5,
+            borderTopWidth: 1,
             borderTopColor: isDark 
-              ? 'rgba(255, 255, 255, 0.1)' 
-              : 'rgba(0, 0, 0, 0.1)',
+              ? 'rgba(255, 255, 255, 0.15)' 
+              : 'rgba(0, 0, 0, 0.15)',
+            // Sombra sutil en la parte superior
+            shadowColor: isDark ? '#000000' : '#000000',
+            shadowOffset: {
+              width: 0,
+              height: -2,
+            },
+            shadowOpacity: isDark ? 0.3 : 0.1,
+            shadowRadius: 8,
+            elevation: 8,
           }
         ]} 
       />

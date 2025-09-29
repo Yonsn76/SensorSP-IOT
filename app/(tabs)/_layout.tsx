@@ -24,12 +24,15 @@ export default function TabLayout() {
           borderTopWidth: 0,
           elevation: 0,
           shadowOpacity: 0,
+          paddingTop: 4,
+          paddingBottom: 4,
+          height: 60,
         },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: 'Inicio',
           headerShown: false,
           headerStyle: { display: 'none' },
           header: () => null,
@@ -78,9 +81,26 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="sensors"
+        options={{
+          title: 'Sensores',
+          headerShown: false,
+          headerStyle: { display: 'none' },
+          header: () => null,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon 
+              iconName="hardware-chip-outline" 
+              color={color} 
+              focused={focused} 
+              size={26}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="notifications"
         options={{
-          title: 'Notificaciones',
+          title: 'Avisos',
           headerShown: false,
           headerStyle: { display: 'none' },
           header: () => null,
@@ -97,7 +117,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Configuración',
+          title: 'Ajustes',
           headerShown: false,
           headerStyle: { display: 'none' },
           header: () => null,

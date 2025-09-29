@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import {
     FlatList,
@@ -34,20 +35,21 @@ export default function RecordsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'temperature' | 'humidity'>('recent');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [temperatureRange, setTemperatureRange] = useState<{ min: number; max: number }>({ min: 0, max: 50 });
   const [humidityRange, setHumidityRange] = useState<{ min: number; max: number }>({ min: 0, max: 100 });
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
       setLoading(true);
       console.log('🔄 Loading sensor records...');
       const data = await sensorApi.getAllSensors();
-      console.log('📊 Raw API data:', data);
-      console.log('📊 Data length:', data.length);
-      console.log('📊 First record:', data[0]);
+      console.log('Raw API data:', data);
+      console.log('Data length:', data.length);
+      console.log('First record:', data[0]);
       setSensorData(data);
       console.log(`   Loaded ${data.length} sensor records`);
     } catch (error) {
@@ -63,6 +65,14 @@ export default function RecordsScreen() {
     await loadData();
     setRefreshing(false);
   };
+
+  // Debounce search query for better performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     loadData();
@@ -102,55 +112,73 @@ export default function RecordsScreen() {
     }
   };
 
-  // Advanced filtering and search
-  const filteredRecords = records.filter(record => {
-    // Basic status filter
-    if (selectedFilter !== 'all' && record.status !== selectedFilter) return false;
+  // Optimized filtering and search with memoization
+  const filteredRecords = React.useMemo(() => {
+    if (!records.length) return [];
     
-    // Search query filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = 
-        record.sensorId.toLowerCase().includes(query) ||
-        record.actuator.toLowerCase().includes(query) ||
-        record.timestamp.toLowerCase().includes(query) ||
-        record.temperature.toString().includes(query) ||
-        record.humidity.toString().includes(query) ||
-        getStatusText(record.status).toLowerCase().includes(query);
+    return records.filter(record => {
+      // Basic status filter - early return for better performance
+      if (selectedFilter !== 'all' && record.status !== selectedFilter) return false;
       
-      if (!matchesSearch) return false;
-    }
-    
-    // Temperature range filter
-    if (record.temperature < temperatureRange.min || record.temperature > temperatureRange.max) return false;
-    
-    // Humidity range filter
-    if (record.humidity < humidityRange.min || record.humidity > humidityRange.max) return false;
-    
-    return true;
-  });
+      // Search query filter - optimized with early returns
+      if (debouncedSearchQuery.trim()) {
+        const query = debouncedSearchQuery.toLowerCase().trim();
+        const sensorIdLower = record.sensorId.toLowerCase();
+        const actuatorLower = record.actuator.toLowerCase();
+        const timestampLower = record.timestamp.toLowerCase();
+        const statusLower = getStatusText(record.status).toLowerCase();
+        
+        // Check most common searches first for better performance
+        if (!sensorIdLower.includes(query) && 
+            !actuatorLower.includes(query) && 
+            !timestampLower.includes(query) &&
+            !record.temperature.toString().includes(query) &&
+            !record.humidity.toString().includes(query) &&
+            !statusLower.includes(query)) {
+          return false;
+        }
+      }
+      
+      // Range filters - only apply if ranges are not default
+      if (temperatureRange.min !== 0 || temperatureRange.max !== 50) {
+        if (record.temperature < temperatureRange.min || record.temperature > temperatureRange.max) return false;
+      }
+      
+      if (humidityRange.min !== 0 || humidityRange.max !== 100) {
+        if (record.humidity < humidityRange.min || record.humidity > humidityRange.max) return false;
+      }
+      
+      // Date filter
+      if (dateFilter) {
+        const recordDate = new Date(record.timestamp);
+        const filterDate = new Date(dateFilter);
+        const isSameDay = recordDate.getDate() === filterDate.getDate() &&
+                         recordDate.getMonth() === filterDate.getMonth() &&
+                         recordDate.getFullYear() === filterDate.getFullYear();
+        
+        if (!isSameDay) return false;
+      }
+      
+      return true;
+    });
+  }, [records, selectedFilter, debouncedSearchQuery, temperatureRange, humidityRange, dateFilter]);
 
-  // Sorting
-  const sortedRecords = [...filteredRecords].sort((a, b) => {
-    let comparison = 0;
+  // Optimized sorting with memoization
+  const sortedRecords = React.useMemo(() => {
+    if (!filteredRecords.length) return [];
     
-    switch (sortBy) {
-      case 'recent':
-        comparison = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-        break;
-      case 'oldest':
-        comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-        break;
-      case 'temperature':
-        comparison = b.temperature - a.temperature; // Más caliente primero
-        break;
-      case 'humidity':
-        comparison = b.humidity - a.humidity; // Más húmedo primero
-        break;
-    }
-    
-    return comparison;
-  });
+    return [...filteredRecords].sort((a, b) => {
+      // Por defecto ordenar por fecha
+      let comparison = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      
+      // Aplicar orden ascendente o descendente
+      if (sortOrder === 'asc') {
+        comparison = -comparison; // Invertir para ascendente
+      }
+      
+      return comparison;
+    });
+  }, [filteredRecords, sortOrder]);
 
   const getCardStyle = (status: string) => {
     switch (status) {
@@ -161,33 +189,39 @@ export default function RecordsScreen() {
     }
   };
 
-  const getSortLabel = (sortBy: string) => {
-    switch (sortBy) {
-      case 'recent': return 'Más Recientes';
-      case 'oldest': return 'Más Antiguos';
-      case 'temperature': return 'Más Calientes';
-      case 'humidity': return 'Más Húmedos';
-      default: return 'Más Recientes';
-    }
-  };
-
-  const getSortIcon = (sortBy: string) => {
-    switch (sortBy) {
-      case 'recent': return 'time-outline';
-      case 'oldest': return 'time-outline';
-      case 'temperature': return 'thermometer-outline';
-      case 'humidity': return 'water-outline';
-      default: return 'time-outline';
-    }
-  };
 
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedFilter('all');
-    setSortBy('recent');
+    setSortOrder('desc');
     setTemperatureRange({ min: 0, max: 50 });
     setHumidityRange({ min: 0, max: 100 });
+    setDateFilter(null);
   };
+
+  // Quick filter functions
+  const applyQuickFilter = (filterType: string) => {
+    switch (filterType) {
+      case 'today':
+        // Filtrar registros de hoy con fecha específica
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Inicio del día
+        setDateFilter(today.toISOString());
+        setSelectedFilter('all'); // Mostrar todos los estados para hoy
+        break;
+      case 'alerts':
+        setSelectedFilter('warning');
+        setDateFilter(null); // Limpiar filtro de fecha
+        break;
+      default:
+        break;
+    }
+  };
+
+  const hasActiveFilters = searchQuery.trim() !== '' || selectedFilter !== 'all' || 
+    temperatureRange.min !== 0 || temperatureRange.max !== 50 ||
+    humidityRange.min !== 0 || humidityRange.max !== 100 ||
+    dateFilter !== null;
 
   const renderRecord = ({ item }: { item: SensorRecord }) => (
     <LiquidGlassCard style={[styles.recordCard, getCardStyle(item.status)]}>
@@ -234,63 +268,65 @@ export default function RecordsScreen() {
       backgroundColor: isDark ? '#000000' : '#FFFFFF',
     },
     header: {
-      padding: 20,
-      paddingTop: 60,
+      padding: 16,
+      paddingTop: 10,
       backgroundColor: 'transparent',
     },
-    headerTitle: {
-      fontSize: 34,
-      fontWeight: '700',
-      color: isDark ? '#FFFFFF' : '#000000',
-      marginBottom: 4,
-      letterSpacing: -0.5,
+    headerGlass: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      shadowColor: isDark ? '#000000' : '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
     },
-    headerSubtitle: {
-      fontSize: 17,
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    headerIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+    },
+    headerTextContainer: {
+      flex: 1,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
       color: isDark ? '#FFFFFF' : '#000000',
-      fontWeight: '400',
+      letterSpacing: -0.2,
+    },
+    exportButtonHeader: {
+      position: 'absolute',
+      bottom: 8,
+      right: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
     },
     totalReadings: {
       fontSize: 14,
       color: isDark ? '#FFFFFF' : '#000000',
       fontWeight: '600',
       marginTop: 4,
-    },
-    filterContainer: {
-      flexDirection: 'row',
-      paddingHorizontal: 20,
-      marginBottom: 20,
-    },
-    filterButton: {
-      flex: 1,
-      borderRadius: 24,
-      overflow: 'hidden',
-      marginHorizontal: 5,
-      // Liquid Glass effect 100% Apple - Sin sombras
-      backgroundColor: isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-      borderWidth: 0.5,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-    },
-    filterContent: {
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      alignItems: 'center',
-    },
-    filterButtonActive: {
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
-    },
-    filterButtonInactive: {
-      backgroundColor: 'transparent',
-    },
-    filterButtonText: {
-      fontSize: 14,
-      fontWeight: '500',
-    },
-    filterButtonTextActive: {
-      color: isDark ? '#FFFFFF' : '#000000',
-    },
-    filterButtonTextInactive: {
-      color: isDark ? '#FFFFFF' : '#000000',
     },
     listContainer: {
       padding: 20,
@@ -369,7 +405,7 @@ export default function RecordsScreen() {
     },
     exportButton: {
       position: 'absolute',
-      top: 50,
+      top: 10,
       right: 10,
       backgroundColor: isDark ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)',
       paddingHorizontal: 12,
@@ -384,6 +420,8 @@ export default function RecordsScreen() {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      zIndex: 100,
+      elevation: 10,
     },
     exportButtonText: {
       color: isDark ? '#FFFFFF' : '#000000',
@@ -497,14 +535,72 @@ export default function RecordsScreen() {
       marginTop: 16,
       paddingHorizontal: 20,
     },
+    // Search and Filters Container
+    searchAndFiltersContainer: {
+      backgroundColor: 'transparent',
+    },
+    // Quick Filter Chips Styles
+    quickFiltersWrapper: {
+      backgroundColor: 'transparent',
+      zIndex: 10,
+  
+    },
+    quickFiltersContainer: {
+      marginBottom: 15,
+      backgroundColor: 'transparent',
+      zIndex: 10,
+    },
+    quickFiltersContent: {
+      paddingHorizontal: 20,
+      gap: 8,
+    },
+    quickFilterChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(28, 28, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+      gap: 6,
+      marginRight: 8,
+      zIndex: 15,
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+    },
+    quickFilterChipActive: {
+      backgroundColor: isDark ? 'rgba(10, 132, 255, 0.3)' : 'rgba(0, 122, 255, 0.3)',
+      borderColor: isDark ? 'rgba(10, 132, 255, 0.5)' : 'rgba(0, 122, 255, 0.5)',
+      zIndex: 20,
+      elevation: 10,
+    },
+    quickFilterText: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: isDark ? '#FFFFFF' : '#1D1D1F',
+    },
+    quickFilterTextActive: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+    },
+    clearFilterChip: {
+      backgroundColor: isDark ? 'rgba(255, 69, 58, 0.1)' : 'rgba(255, 59, 48, 0.1)',
+      borderColor: isDark ? 'rgba(255, 69, 58, 0.3)' : 'rgba(255, 59, 48, 0.3)',
+    },
   });
 
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Registros</Text>
-          <Text style={styles.headerSubtitle}>Datos de sensores en tiempo real</Text>
+          <Text style={styles.headerTitle}>Datos de sensores en tiempo real</Text>
         </View>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Cargando registros...</Text>
@@ -518,16 +614,18 @@ export default function RecordsScreen() {
       <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text style={styles.headerTitle}>Registros</Text>
-            <Text style={styles.headerSubtitle}>Datos de sensores en tiempo real</Text>
-            <Text style={styles.totalReadings}>Total: {sensorData.length} lecturas</Text>
+        <View style={styles.headerGlass}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerIconContainer}>
+              <Ionicons name="list-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+            </View>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>Datos de sensores en tiempo real</Text>
+              <Text style={styles.totalReadings}>Total: {sensorData.length} lecturas</Text>
+            </View>
           </View>
-          
-          {/* Export Button */}
           <TouchableOpacity
-            style={styles.exportButton}
+            style={styles.exportButtonHeader}
             onPress={() => setShowExportModal(true)}
           >
             <Ionicons name="cloud-upload-outline" size={16} color={isDark ? '#FFFFFF' : '#000000'} />
@@ -536,101 +634,185 @@ export default function RecordsScreen() {
         </View>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Ionicons name="search-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar registros..."
-            placeholderTextColor={isDark ? '#FFFFFF' : '#000000'}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+      {/* Search and Filters Component */}
+      <View style={styles.searchAndFiltersContainer}>
+        {/* Quick Filters */}
+        <View style={styles.quickFiltersWrapper}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.quickFiltersContainer}
+            contentContainerStyle={styles.quickFiltersContent}
+          >
+            <TouchableOpacity
+              style={[
+                styles.quickFilterChip,
+                selectedFilter === 'all' && styles.quickFilterChipActive
+              ]}
+              onPress={() => setSelectedFilter('all')}
+            >
+              <Ionicons 
+                name="apps-outline" 
+                size={16} 
+                color={selectedFilter === 'all' ? '#FFFFFF' : (isDark ? '#FFFFFF' : '#000000')} 
+              />
+              <Text style={[
+                styles.quickFilterText,
+                selectedFilter === 'all' && styles.quickFilterTextActive
+              ]}>
+                Todos ({records.length})
+              </Text>
             </TouchableOpacity>
-          )}
+
+            <TouchableOpacity
+              style={[
+                styles.quickFilterChip,
+                selectedFilter === 'online' && styles.quickFilterChipActive
+              ]}
+              onPress={() => setSelectedFilter('online')}
+            >
+              <Ionicons 
+                name="checkmark-circle-outline" 
+                size={16} 
+                color={selectedFilter === 'online' ? '#FFFFFF' : '#34C759'} 
+              />
+              <Text style={[
+                styles.quickFilterText,
+                selectedFilter === 'online' && styles.quickFilterTextActive
+              ]}>
+                Normal ({records.filter(r => r.status === 'online').length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.quickFilterChip,
+                selectedFilter === 'warning' && styles.quickFilterChipActive
+              ]}
+              onPress={() => setSelectedFilter('warning')}
+            >
+              <Ionicons 
+                name="warning-outline" 
+                size={16} 
+                color={selectedFilter === 'warning' ? '#FFFFFF' : '#FF3B30'} 
+              />
+              <Text style={[
+                styles.quickFilterText,
+                selectedFilter === 'warning' && styles.quickFilterTextActive
+              ]}>
+                Caliente ({records.filter(r => r.status === 'warning').length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.quickFilterChip,
+                selectedFilter === 'error' && styles.quickFilterChipActive
+              ]}
+              onPress={() => setSelectedFilter('error')}
+            >
+              <Ionicons 
+                name="snow-outline" 
+                size={16} 
+                color={selectedFilter === 'error' ? '#FFFFFF' : '#5AC8FA'} 
+              />
+              <Text style={[
+                styles.quickFilterText,
+                selectedFilter === 'error' && styles.quickFilterTextActive
+              ]}>
+                Frío ({records.filter(r => r.status === 'error').length})
+              </Text>
+            </TouchableOpacity>
+
+            {/* Quick Action Filters */}
+            <TouchableOpacity
+              style={styles.quickFilterChip}
+              onPress={() => applyQuickFilter('today')}
+            >
+              <Ionicons name="today-outline" size={16} color="#007AFF" />
+              <Text style={styles.quickFilterText}>Hoy</Text>
+            </TouchableOpacity>
+
+            {hasActiveFilters && (
+              <TouchableOpacity
+                style={[styles.quickFilterChip, styles.clearFilterChip]}
+                onPress={clearFilters}
+              >
+                <Ionicons name="close-circle" size={16} color="#FF3B30" />
+                <Text style={[styles.quickFilterText, { color: '#FF3B30' }]}>Limpiar</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
         </View>
-        
-        {/* Advanced Filters Toggle */}
-        <TouchableOpacity
-          style={styles.advancedFilterButton}
-          onPress={() => setShowAdvancedFilters(!showAdvancedFilters)}
-        >
-          <Ionicons 
-            name={showAdvancedFilters ? "chevron-up" : "chevron-down"} 
-            size={20} 
-            color={isDark ? '#0A84FF' : '#007AFF'} 
-          />
-        </TouchableOpacity>
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputContainer}>
+            <Ionicons name="search-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por sensor, actuador, fecha..."
+              placeholderTextColor={isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {/* Advanced Filters Toggle */}
+          <TouchableOpacity
+            style={styles.advancedFilterButton}
+            onPress={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          >
+            <Ionicons 
+              name={showAdvancedFilters ? "chevron-up" : "chevron-down"} 
+              size={20} 
+              color={isDark ? '#0A84FF' : '#007AFF'} 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
+
 
       {/* Advanced Filters */}
       {showAdvancedFilters && (
         <View style={styles.advancedFiltersContainer}>
           {/* Sort Controls */}
           <View style={styles.sortContainer}>
-            <Text style={styles.filterLabel}>Ordenar por:</Text>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.sortButtonsContainer}
-              style={styles.sortScrollView}
-            >
+            <Text style={styles.filterLabel}>Ordenar:</Text>
+            <View style={styles.sortButtonsContainer}>
               <TouchableOpacity
                 style={[
                   styles.sortButton,
-                  sortBy === 'recent' && styles.sortButtonActive
+                  sortOrder === 'asc' && styles.sortButtonActive
                 ]}
-                onPress={() => setSortBy('recent')}
+                onPress={() => setSortOrder('asc')}
               >
-                <Ionicons name={getSortIcon('recent')} size={16} color={sortBy === 'recent' ? '#FFFFFF' : (isDark ? '#8E8E93' : '#6D6D70')} />
-                <Text style={[styles.sortButtonText, sortBy === 'recent' && styles.sortButtonTextActive]}>
-                  Recientes
+                <Ionicons name="arrow-up" size={16} color={sortOrder === 'asc' ? '#FFFFFF' : (isDark ? '#8E8E93' : '#6D6D70')} />
+                <Text style={[styles.sortButtonText, sortOrder === 'asc' && styles.sortButtonTextActive]}>
+                  Ascendente
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={[
                   styles.sortButton,
-                  sortBy === 'oldest' && styles.sortButtonActive
+                  sortOrder === 'desc' && styles.sortButtonActive
                 ]}
-                onPress={() => setSortBy('oldest')}
+                onPress={() => setSortOrder('desc')}
               >
-                <Ionicons name={getSortIcon('oldest')} size={16} color={sortBy === 'oldest' ? '#FFFFFF' : (isDark ? '#8E8E93' : '#6D6D70')} />
-                <Text style={[styles.sortButtonText, sortBy === 'oldest' && styles.sortButtonTextActive]}>
-                  Antiguos
+                <Ionicons name="arrow-down" size={16} color={sortOrder === 'desc' ? '#FFFFFF' : (isDark ? '#8E8E93' : '#6D6D70')} />
+                <Text style={[styles.sortButtonText, sortOrder === 'desc' && styles.sortButtonTextActive]}>
+                  Descendente
                 </Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.sortButton,
-                  sortBy === 'temperature' && styles.sortButtonActive
-                ]}
-                onPress={() => setSortBy('temperature')}
-              >
-                <Ionicons name={getSortIcon('temperature')} size={16} color={sortBy === 'temperature' ? '#FFFFFF' : (isDark ? '#8E8E93' : '#6D6D70')} />
-                <Text style={[styles.sortButtonText, sortBy === 'temperature' && styles.sortButtonTextActive]}>
-                  Calientes
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.sortButton,
-                  sortBy === 'humidity' && styles.sortButtonActive
-                ]}
-                onPress={() => setSortBy('humidity')}
-              >
-                <Ionicons name={getSortIcon('humidity')} size={16} color={sortBy === 'humidity' ? '#FFFFFF' : (isDark ? '#8E8E93' : '#6D6D70')} />
-                <Text style={[styles.sortButtonText, sortBy === 'humidity' && styles.sortButtonTextActive]}>
-                  Húmedos
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
+            </View>
           </View>
           
           {/* Clear Filters Button */}
@@ -644,84 +826,6 @@ export default function RecordsScreen() {
         </View>
       )}
 
-      {/* Filter Buttons */}
-      <View style={styles.filterContainer}>
-        <View style={styles.filterButton}>
-          <TouchableOpacity
-            style={[
-              styles.filterContent,
-              selectedFilter === 'all' ? styles.filterButtonActive : styles.filterButtonInactive,
-            ]}
-            onPress={() => setSelectedFilter('all')}
-          >
-            <Text
-              style={[
-                styles.filterButtonText,
-                selectedFilter === 'all' ? styles.filterButtonTextActive : styles.filterButtonTextInactive,
-              ]}
-            >
-              Todos
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.filterButton}>
-          <TouchableOpacity
-            style={[
-              styles.filterContent,
-              selectedFilter === 'online' ? styles.filterButtonActive : styles.filterButtonInactive,
-            ]}
-            onPress={() => setSelectedFilter('online')}
-          >
-            <Text
-              style={[
-                styles.filterButtonText,
-                selectedFilter === 'online' ? styles.filterButtonTextActive : styles.filterButtonTextInactive,
-              ]}
-            >
-              En Línea
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.filterButton}>
-          <TouchableOpacity
-            style={[
-              styles.filterContent,
-              selectedFilter === 'warning' ? styles.filterButtonActive : styles.filterButtonInactive,
-            ]}
-            onPress={() => setSelectedFilter('warning')}
-          >
-            <Text
-              style={[
-                styles.filterButtonText,
-                selectedFilter === 'warning' ? styles.filterButtonTextActive : styles.filterButtonTextInactive,
-              ]}
-            >
-              Caliente
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.filterButton}>
-          <TouchableOpacity
-            style={[
-              styles.filterContent,
-              selectedFilter === 'error' ? styles.filterButtonActive : styles.filterButtonInactive,
-            ]}
-            onPress={() => setSelectedFilter('error')}
-          >
-            <Text
-              style={[
-                styles.filterButtonText,
-                selectedFilter === 'error' ? styles.filterButtonTextActive : styles.filterButtonTextInactive,
-              ]}
-            >
-              Frío
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <FlatList
         data={sortedRecords}
