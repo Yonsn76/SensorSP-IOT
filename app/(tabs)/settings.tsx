@@ -24,6 +24,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { sensorApi } from '../../services/sensorApi';
 import { notificationService } from '../../services/notificationService';
 import { userPreferencesApi } from '../../services/userPreferencesApi';
+import { WidgetPreview } from '../../components/WidgetPreview';
 
 export default function SettingsScreen() {
   const { isDark, themeMode, setThemeMode } = useTheme();
@@ -38,11 +39,21 @@ export default function SettingsScreen() {
   // Estados básicos
   const [showExportModal, setShowExportModal] = useState(false);
   const [showAdvancedExportModal, setShowAdvancedExportModal] = useState(false);
+  const [showWidgetPreview, setShowWidgetPreview] = useState(false);
   
   // Estados para preferencias
   const [preferredLocation, setPreferredLocation] = useState<string>('');
   const [availableLocations, setAvailableLocations] = useState<string[]>([]);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  
+  // Estados para mostrar preferencias cargadas
+  const [userPreferencesLoaded, setUserPreferencesLoaded] = useState(false);
+  const [userPreferencesInfo, setUserPreferencesInfo] = useState({
+    customNotifications: 0,
+    activeNotifications: 0,
+    totalNotifications: 0,
+    lastUpdated: null as string | null
+  });
   
 
   // Cargar configuraciones guardadas
@@ -52,10 +63,43 @@ export default function SettingsScreen() {
 
   const loadSettings = async () => {
     try {
+      // Cargar configuraciones locales
       const settings = await AsyncStorage.getItem('app_settings');
       if (settings) {
         const parsedSettings = JSON.parse(settings);
         setPreferredLocation(parsedSettings.preferredLocation || '');
+      }
+      
+      // Cargar preferencias del usuario desde la API
+      if (user?.id && user?.token) {
+        try {
+          const userPreferences = await userPreferencesApi.getUserPreferences(user.id, user.token);
+          if (userPreferences.success && userPreferences.data) {
+            // Actualizar la ubicación preferida desde la API
+            if (userPreferences.data.preferredLocation) {
+              setPreferredLocation(userPreferences.data.preferredLocation);
+            }
+            
+            // Guardar información de preferencias para mostrar
+            setUserPreferencesInfo({
+              customNotifications: userPreferences.data.customNotifications?.length || 0,
+              activeNotifications: userPreferences.data.activeNotifications?.length || 0,
+              totalNotifications: userPreferences.data.totalNotifications || 0,
+              lastUpdated: userPreferences.data.lastUpdated
+            });
+            setUserPreferencesLoaded(true);
+            
+            console.log('User preferences loaded from API:', {
+              preferredLocation: userPreferences.data.preferredLocation,
+              customNotifications: userPreferences.data.customNotifications?.length || 0,
+              activeNotifications: userPreferences.data.activeNotifications?.length || 0,
+              totalNotifications: userPreferences.data.totalNotifications || 0
+            });
+          }
+        } catch (apiError) {
+          console.error('Error loading user preferences from API:', apiError);
+          // Continuar con configuraciones locales si falla la API
+        }
       }
       
       // Cargar ubicaciones disponibles
@@ -476,6 +520,24 @@ export default function SettingsScreen() {
       marginLeft: 12,
       flex: 1,
     },
+    widgetModalContainer: {
+      flex: 1,
+    },
+    widgetModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      paddingTop: 50,
+      borderBottomWidth: 1,
+    },
+    widgetModalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    widgetModalCloseButton: {
+      padding: 8,
+    },
   });
 
   return (
@@ -607,13 +669,35 @@ export default function SettingsScreen() {
                 <Ionicons name="chevron-down-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
               </TouchableOpacity>
             </View>
-
+            
             <TouchableOpacity 
               style={styles.savePreferencesButton}
               onPress={savePreferencesToDatabase}
             >
               <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" />
               <Text style={styles.savePreferencesButtonText}>Guardar Preferencias en BD</Text>
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+
+        {/* Widgets */}
+        <BlurView
+          intensity={isDark ? 20 : 30}
+          tint={isDark ? 'dark' : 'light'}
+          style={styles.section}
+        >
+          <View style={styles.sectionContent}>
+            <Text style={styles.sectionTitle}>
+              <Ionicons name="grid-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              {' '}Widgets
+            </Text>
+            
+            <TouchableOpacity 
+              style={[styles.settingItem, styles.settingItemLast]}
+              onPress={() => setShowWidgetPreview(true)}
+            >
+              <Text style={styles.settingLabel}>Vista Previa de Widgets</Text>
+              <Ionicons name="chevron-forward-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
             </TouchableOpacity>
           </View>
         </BlurView>
@@ -781,6 +865,28 @@ export default function SettingsScreen() {
         visible={showAdvancedExportModal}
         onClose={() => setShowAdvancedExportModal(false)}
       />
+
+      {/* Widget Preview Modal */}
+      <Modal
+        visible={showWidgetPreview}
+        animationType="slide"
+        onRequestClose={() => setShowWidgetPreview(false)}
+      >
+        <View style={[styles.widgetModalContainer, { backgroundColor: isDark ? '#000000' : '#FFFFFF' }]}>
+          <View style={[styles.widgetModalHeader, { borderBottomColor: isDark ? '#333333' : '#E0E0E0' }]}>
+            <Text style={[styles.widgetModalTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+              Vista Previa de Widgets
+            </Text>
+            <TouchableOpacity 
+              onPress={() => setShowWidgetPreview(false)}
+              style={styles.widgetModalCloseButton}
+            >
+              <Ionicons name="close-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+            </TouchableOpacity>
+          </View>
+          <WidgetPreview />
+        </View>
+      </Modal>
 
       {/* Modal para seleccionar ubicación */}
       <Modal

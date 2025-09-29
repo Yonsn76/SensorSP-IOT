@@ -73,17 +73,55 @@ class UserPreferencesApi {
     }
   }
 
-  // GET - Obtener solo la ubicación preferida del usuario
+  // GET - Obtener solo la ubicación preferida del usuario (endpoint optimizado)
   async getPreferredLocation(userId: string, token: string): Promise<string | null> {
     try {
-      const response = await this.getUserPreferences(userId, token);
-      if (response.success && response.data) {
-        return response.data.preferredLocation;
+      const response = await axios.get(`${API_BASE_URL}/${userId}/location`, {
+        headers: this.getAuthHeaders(token)
+      });
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data.preferredLocation;
       }
       return null;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting preferred location:', error);
       return null;
+    }
+  }
+
+  // GET - Obtener todas las preferencias (para administración)
+  async getAllUserPreferences(token: string, page: number = 1, limit: number = 10, sortBy: string = 'lastUpdated', sortOrder: string = 'desc'): Promise<ApiResponse<{ data: UserPreferences[], pagination: any }>> {
+    try {
+      const response = await axios.get(API_BASE_URL, {
+        headers: this.getAuthHeaders(token),
+        params: { page, limit, sortBy, sortOrder }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error getting all user preferences:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Error al obtener todas las preferencias',
+        error: error.message
+      };
+    }
+  }
+
+  // GET - Obtener estadísticas de preferencias
+  async getPreferencesStats(token: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/stats`, {
+        headers: this.getAuthHeaders(token)
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error getting preferences stats:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Error al obtener estadísticas',
+        error: error.message
+      };
     }
   }
 
