@@ -13,12 +13,13 @@ import {
   FlatList,
 } from 'react-native';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
-import CustomDateRangeSelector, { DateRange } from '../../components/CustomDateRangeSelector';
-import { ProtectedRoute } from '../../components/ProtectedRoute';
+import { CustomDateRangeSelector, DateRange } from '../../components/ui/inputs';
+import { ProtectedRoute } from '../../components/auth';
 import ScrollableChart from '../../components/ScrollableChart';
-import TimeRangeSelector, { TimeRange } from '../../components/TimeRangeSelector';
+import { TimeRangeSelector, TimeRange } from '../../components/ui/inputs';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useGlobalStyles } from '../../styles';
 import { sensorApi } from '../../services/sensorApi';
 import { userPreferencesApi } from '../../services/userPreferencesApi';
 
@@ -27,9 +28,24 @@ const screenWidth = Dimensions.get('window').width;
 export default function HistoricsScreen() {
   const { isDark } = useTheme();
   const { user } = useAuth();
+  const globalStyles = useGlobalStyles();
   
   const [sensorData, setSensorData] = useState<Array<{ fecha: string; temperatura: number; humedad: number }>>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDots, setLoadingDots] = useState('');
+
+  // Animación de puntos para el loading
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setLoadingDots(prev => {
+          if (prev === '...') return '';
+          return prev + '.';
+        });
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [loading]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('today');
   const [showTimeRangeSelector, setShowTimeRangeSelector] = useState(false);
@@ -39,29 +55,29 @@ export default function HistoricsScreen() {
   const [uniqueSensors, setUniqueSensors] = useState<any[]>([]);
   const [showSensorModal, setShowSensorModal] = useState(false);
 
-  const loadPreferredLocationAndSetSensor = async (uniqueSensorsArray: any[]) => {
+  const loadPreferredSensorAndSetSensor = async (uniqueSensorsArray: any[]) => {
     try {
       if (!user?.id || !user?.token) return;
-      
-      // Load preferred location from API
-      const preferredLocation = await userPreferencesApi.getPreferredLocation(user.id, user.token);
-      
-      if (preferredLocation) {
-        // Find sensor with preferred location
-        const preferredSensor = uniqueSensorsArray.find(sensor => sensor.ubicacion === preferredLocation);
+
+      // Load preferred sensor ID from API
+      const preferredSensorId = await userPreferencesApi.getPreferredSensor(user.id, user.token);
+
+      if (preferredSensorId) {
+        // Find sensor with preferred sensor ID
+        const preferredSensor = uniqueSensorsArray.find(sensor => sensor.sensorId === preferredSensorId);
         if (preferredSensor) {
           setSelectedSensor(preferredSensor);
-          console.log(`Using preferred location in historics: ${preferredLocation}`);
+          console.log(`Using preferred sensor in historics: ${preferredSensorId}`);
           return;
         }
       }
-      
-      // Fallback to default logic if no preferred location or sensor not found
+
+      // Fallback to default logic if no preferred sensor or sensor not found
       if (!selectedSensor && uniqueSensorsArray.length > 0) {
         setSelectedSensor(uniqueSensorsArray[0]);
       }
     } catch (error) {
-      console.error('Error loading preferred location in historics:', error);
+      console.error('Error loading preferred sensor in historics:', error);
       // Fallback to default logic
       if (!selectedSensor && uniqueSensorsArray.length > 0) {
         setSelectedSensor(uniqueSensorsArray[0]);
@@ -111,8 +127,8 @@ export default function HistoricsScreen() {
       const uniqueSensorsArray = Array.from(uniqueSensorMap.values());
       setUniqueSensors(uniqueSensorsArray);
       
-      // Load preferred location and set selected sensor
-      await loadPreferredLocationAndSetSensor(uniqueSensorsArray);
+      // Load preferred sensor and set selected sensor
+      await loadPreferredSensorAndSetSensor(uniqueSensorsArray);
       
       console.log('Historical data loaded successfully');
     } catch (error) {
@@ -367,19 +383,16 @@ export default function HistoricsScreen() {
     },
     header: {
       padding: 16,
-      paddingTop: 10,
+      paddingTop: 50,
       backgroundColor: 'transparent',
     },
     headerGlass: {
-      borderRadius: 16,
+      borderRadius: 12,
       overflow: 'hidden',
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-      shadowColor: isDark ? '#000000' : '#000000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 8,
+      backgroundColor: isDark ? 'rgba(28, 28, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+      // Sin sombras para que se vea igual al botón
     },
     headerContent: {
       flexDirection: 'row',
@@ -424,133 +437,22 @@ export default function HistoricsScreen() {
       color: isDark ? '#FFFFFF' : '#1D1D1F',
       marginLeft: 8,
     },
-    chartContainer: {
-      borderRadius: 20,
-      overflow: 'hidden',
-      marginBottom: 20,
-      marginHorizontal: screenWidth < 400 ? 10 : 0,
-      // Liquid Glass effect
-      backgroundColor: isDark ? 'rgba(28, 28, 30, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-      borderWidth: 1.5,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.15)',
-      // Shadow for depth
-      shadowColor: isDark ? '#000000' : '#000000',
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: isDark ? 0.4 : 0.15,
-      shadowRadius: 16,
-      elevation: 8,
-    },
-    chartContent: {
-      padding: screenWidth < 400 ? 15 : 20,
-    },
-    chartTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: isDark ? '#FFFFFF' : '#1D1D1F',
-      marginBottom: 16,
-    },
+    // Chart styles now use globalStyles.chartContainer, chartContent, chartTitle
     chartDescription: {
       fontSize: 14,
       color: isDark ? '#8E8E93' : '#6D6D70',
       marginBottom: 16,
       lineHeight: 20,
     },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    loadingText: {
-      fontSize: 16,
-      color: isDark ? '#8E8E93' : '#6D6D70',
-      marginTop: 16,
-    },
+    // Loading styles now use globalStyles.loadingContainer, loadingText
     pieChartWrapper: {
       alignItems: 'center',
       justifyContent: 'center',
       width: '100%',
     },
-    sensorSelectorContainer: {
-      alignItems: 'center',
-      marginVertical: 16,
-    },
-    sensorSelectorButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
-      gap: 8,
-    },
-    sensorSelectorText: {
-      fontSize: 16,
-      fontWeight: '500',
-      color: isDark ? '#FFFFFF' : '#000000',
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'flex-end',
-    },
-    modalBackdrop: {
-      flex: 1,
-    },
-    modalContent: {
-      backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      maxHeight: '60%',
-      minHeight: '40%',
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-    },
-    modalTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: isDark ? '#FFFFFF' : '#000000',
-    },
-    modalCloseButton: {
-      padding: 4,
-    },
-    sensorOption: {
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-    },
-    selectedSensorOption: {
-      backgroundColor: isDark ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)',
-    },
-    sensorOptionContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    sensorOptionInfo: {
-      flex: 1,
-      marginLeft: 12,
-    },
-    sensorOptionLocation: {
-      fontSize: 16,
-      fontWeight: '500',
-      color: isDark ? '#FFFFFF' : '#000000',
-    },
-    sensorOptionId: {
-      fontSize: 14,
-      color: isDark ? '#8E8E93' : '#6D6D70',
-      marginTop: 2,
-    },
+    // Sensor selector styles now use globalStyles.sensorSelectorContainer, sensorSelectorButton, sensorSelectorText
+    // Modal styles now use globalStyles.modalOverlay, modalBackdrop, modalContent, modalHeader, modalTitle, modalCloseButton
+    // Sensor option styles now use globalStyles.sensorOption, selectedSensorOption, sensorOptionContent, sensorOptionInfo, sensorOptionLocation, sensorOptionId
   });
 
   if (loading) {
@@ -559,8 +461,8 @@ export default function HistoricsScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Análisis detallado de datos</Text>
         </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Cargando análisis histórico...</Text>
+        <View style={globalStyles.loadingContainer}>
+          <Text style={globalStyles.loadingText}>Obteniendo registro{loadingDots}</Text>
         </View>
       </View>
     );
@@ -571,7 +473,11 @@ export default function HistoricsScreen() {
       <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerGlass}>
+        <BlurView
+          intensity={isDark ? 20 : 0}
+          tint={isDark ? 'dark' : 'light'}
+          style={styles.headerGlass}
+        >
           <View style={styles.headerContent}>
             <View style={styles.headerIconContainer}>
               <Ionicons name="analytics-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
@@ -587,18 +493,18 @@ export default function HistoricsScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </BlurView>
       </View>
 
       {/* Sensor Selector Button */}
       {selectedSensor && uniqueSensors.length > 1 && (
-        <View style={styles.sensorSelectorContainer}>
+        <View style={globalStyles.sensorSelectorContainer}>
           <TouchableOpacity
-            style={styles.sensorSelectorButton}
+            style={globalStyles.sensorSelectorButton}
             onPress={() => setShowSensorModal(true)}
           >
             <Ionicons name="hardware-chip-outline" size={16} color={isDark ? '#FFFFFF' : '#000000'} />
-            <Text style={styles.sensorSelectorText}>{selectedSensor.sensorId}</Text>
+            <Text style={globalStyles.sensorSelectorText}>{selectedSensor.sensorId}</Text>
             <Ionicons name="chevron-down-outline" size={14} color={isDark ? '#FFFFFF' : '#000000'} />
           </TouchableOpacity>
         </View>
@@ -612,9 +518,9 @@ export default function HistoricsScreen() {
         }
       >
                  {/* LineChart - Serie temporal */}
-         <View style={styles.chartContainer}>
-           <View style={styles.chartContent}>
-             <Text style={styles.chartTitle}>
+         <View style={[globalStyles.chartContainer, { marginHorizontal: screenWidth < 400 ? 10 : 0 }]}>
+           <View style={globalStyles.chartContent}>
+             <Text style={globalStyles.chartTitle}>
                <Ionicons name="trending-up-outline" size={20} color={isDark ? '#FFFFFF' : '#1D1D1F'} />
                {' '}Serie Temporal - Temperatura
              </Text>
@@ -640,15 +546,15 @@ export default function HistoricsScreen() {
                 />
               </ScrollableChart>
             ) : (
-              <Text style={styles.loadingText}>No hay datos disponibles</Text>
+              <Text style={globalStyles.loadingText}>No hay datos disponibles</Text>
             )}
           </View>
         </View>
 
                  {/* BarChart - Comparación de promedios */}
-         <View style={styles.chartContainer}>
-           <View style={styles.chartContent}>
-             <Text style={styles.chartTitle}>
+         <View style={[globalStyles.chartContainer, { marginHorizontal: screenWidth < 400 ? 10 : 0 }]}>
+           <View style={globalStyles.chartContent}>
+             <Text style={globalStyles.chartTitle}>
                <Ionicons name="time-outline" size={20} color={isDark ? '#FFFFFF' : '#1D1D1F'} />
                {' '}Tendencias por Hora del Día
              </Text>
@@ -675,15 +581,15 @@ export default function HistoricsScreen() {
                  />
                </ScrollableChart>
              ) : (
-               <Text style={styles.loadingText}>No hay datos disponibles</Text>
+               <Text style={globalStyles.loadingText}>No hay datos disponibles</Text>
              )}
           </View>
         </View>
 
                  {/* PieChart - Distribución de estados */}
-         <View style={styles.chartContainer}>
-           <View style={styles.chartContent}>
-             <Text style={styles.chartTitle}>
+         <View style={[globalStyles.chartContainer, { marginHorizontal: screenWidth < 400 ? 10 : 0 }]}>
+           <View style={globalStyles.chartContent}>
+             <Text style={globalStyles.chartTitle}>
                <Ionicons name="pie-chart-outline" size={20} color={isDark ? '#FFFFFF' : '#1D1D1F'} />
                {' '}Distribución de Estados
              </Text>
@@ -704,15 +610,15 @@ export default function HistoricsScreen() {
                 />
               </View>
             ) : (
-              <Text style={styles.loadingText}>No hay datos disponibles</Text>
+              <Text style={globalStyles.loadingText}>No hay datos disponibles</Text>
             )}
           </View>
         </View>
 
                  {/* LineChart - Correlación Temp vs Humedad */}
-         <View style={styles.chartContainer}>
-           <View style={styles.chartContent}>
-             <Text style={styles.chartTitle}>
+         <View style={[globalStyles.chartContainer, { marginHorizontal: screenWidth < 400 ? 10 : 0 }]}>
+           <View style={globalStyles.chartContent}>
+             <Text style={globalStyles.chartTitle}>
                <Ionicons name="analytics-outline" size={20} color={isDark ? '#FFFFFF' : '#1D1D1F'} />
                {' '}Análisis de Variabilidad
              </Text>
@@ -738,15 +644,15 @@ export default function HistoricsScreen() {
                  />
                </ScrollableChart>
              ) : (
-               <Text style={styles.loadingText}>No hay datos disponibles</Text>
+               <Text style={globalStyles.loadingText}>No hay datos disponibles</Text>
              )}
           </View>
         </View>
 
                  {/* BarChart - Acciones del sistema */}
-         <View style={styles.chartContainer}>
-           <View style={styles.chartContent}>
-             <Text style={styles.chartTitle}>
+         <View style={[globalStyles.chartContainer, { marginHorizontal: screenWidth < 400 ? 10 : 0 }]}>
+           <View style={globalStyles.chartContent}>
+             <Text style={globalStyles.chartTitle}>
                <Ionicons name="speedometer-outline" size={20} color={isDark ? '#FFFFFF' : '#1D1D1F'} />
                {' '}Análisis de Eficiencia
              </Text>
@@ -773,7 +679,7 @@ export default function HistoricsScreen() {
                  />
                </ScrollableChart>
              ) : (
-               <Text style={styles.loadingText}>No hay datos disponibles</Text>
+               <Text style={globalStyles.loadingText}>No hay datos disponibles</Text>
              )}
           </View>
         </View>
@@ -801,18 +707,18 @@ export default function HistoricsScreen() {
         animationType="slide"
         onRequestClose={() => setShowSensorModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={globalStyles.modalOverlay}>
           <TouchableOpacity 
-            style={styles.modalBackdrop} 
+            style={globalStyles.modalBackdrop} 
             activeOpacity={1} 
             onPress={() => setShowSensorModal(false)}
           />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Seleccionar Sensor</Text>
+          <View style={globalStyles.modalContent}>
+            <View style={globalStyles.modalHeader}>
+              <Text style={globalStyles.modalTitle}>Seleccionar Sensor</Text>
               <TouchableOpacity 
                 onPress={() => setShowSensorModal(false)}
-                style={styles.modalCloseButton}
+                style={globalStyles.modalCloseButton}
               >
                 <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
               </TouchableOpacity>
@@ -824,23 +730,23 @@ export default function HistoricsScreen() {
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
-                    styles.sensorOption,
-                    selectedSensor?.sensorId === item.sensorId && styles.selectedSensorOption
+                    globalStyles.sensorOption,
+                    selectedSensor?.sensorId === item.sensorId && globalStyles.selectedSensorOption
                   ]}
                   onPress={() => {
                     setSelectedSensor(item);
                     setShowSensorModal(false);
                   }}
                 >
-                  <View style={styles.sensorOptionContent}>
+                  <View style={globalStyles.sensorOptionContent}>
                     <Ionicons 
                       name="location-outline" 
                       size={20} 
                       color={isDark ? '#FFFFFF' : '#000000'} 
                     />
-                    <View style={styles.sensorOptionInfo}>
-                      <Text style={styles.sensorOptionLocation}>{item.ubicacion}</Text>
-                      <Text style={styles.sensorOptionId}>ID: {item.sensorId}</Text>
+                    <View style={globalStyles.sensorOptionInfo}>
+                      <Text style={globalStyles.sensorOptionLocation}>{item.ubicacion}</Text>
+                      <Text style={globalStyles.sensorOptionId}>ID: {item.sensorId}</Text>
                     </View>
                     {selectedSensor?.sensorId === item.sensorId && (
                       <Ionicons 

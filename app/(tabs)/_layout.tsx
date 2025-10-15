@@ -3,11 +3,13 @@ import React from 'react';
 
 import { HapticTab } from '@/components/HapticTab';
 import { TabBarIcon } from '@/components/TabBarIcon';
-import TabBarBackground from '@/components/ui/TabBarBackground';
+import { TabBarBackground } from '@/components/ui/common';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function TabLayout() {
   const { isDark } = useTheme();
+  const { responsiveSizes, isSmallScreen } = useResponsive();
 
   return (
     <Tabs
@@ -24,9 +26,9 @@ export default function TabLayout() {
           borderTopWidth: 0,
           elevation: 0,
           shadowOpacity: 0,
-          paddingTop: 4,
-          paddingBottom: 4,
-          height: 60,
+          paddingTop: responsiveSizes.spacingSmall,
+          paddingBottom: responsiveSizes.spacingSmall,
+          height: isSmallScreen ? 60 : 65,
         },
       }}>
       <Tabs.Screen
@@ -41,7 +43,7 @@ export default function TabLayout() {
               iconName="grid-outline" 
               color={color} 
               focused={focused} 
-              size={26}
+              size={isSmallScreen ? 22 : 24}
             />
           ),
         }}
@@ -58,7 +60,7 @@ export default function TabLayout() {
               iconName="analytics-outline" 
               color={color} 
               focused={focused} 
-              size={26}
+              size={isSmallScreen ? 22 : 24}
             />
           ),
         }}
@@ -75,7 +77,7 @@ export default function TabLayout() {
               iconName="list-outline" 
               color={color} 
               focused={focused} 
-              size={26}
+              size={isSmallScreen ? 22 : 24}
             />
           ),
         }}
@@ -92,7 +94,7 @@ export default function TabLayout() {
               iconName="hardware-chip-outline" 
               color={color} 
               focused={focused} 
-              size={26}
+              size={isSmallScreen ? 22 : 24}
             />
           ),
         }}
@@ -109,7 +111,7 @@ export default function TabLayout() {
               iconName="notifications-outline" 
               color={color} 
               focused={focused} 
-              size={26}
+              size={isSmallScreen ? 22 : 24}
             />
           ),
         }}
@@ -126,7 +128,7 @@ export default function TabLayout() {
               iconName="settings-outline" 
               color={color} 
               focused={focused} 
-              size={26}
+              size={isSmallScreen ? 22 : 24}
             />
           ),
         }}

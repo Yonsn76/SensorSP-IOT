@@ -11,12 +11,12 @@ import {
   FlatList,
   Dimensions,
 } from 'react-native';
-import { getThemeColors } from '../constants/Colors';
-import { useTheme } from '../contexts/ThemeContext';
-import { NotificationRule } from '../services/notificationService';
-import { sensorApi } from '../services/sensorApi';
-import LiquidGlassButton from './ui/LiquidGlassButton';
-import LiquidGlassModal from './ui/LiquidGlassModal';
+import { getThemeColors } from '../../../constants/Colors';
+import { useTheme } from '../../../contexts/ThemeContext';
+import { NotificationRule } from '../../../services/notificationService';
+import { sensorApi } from '../../../services/sensorApi';
+import { LiquidGlassButton } from '../buttons';
+import { LiquidGlassModal } from './LiquidGlassModal';
 
 interface AddAlertModalProps {
   visible: boolean;
@@ -90,8 +90,7 @@ export default function AddAlertModal({ visible, onClose, onAddAlert }: AddAlert
       condition: condition,
       value: alertType === 'temperature' || alertType === 'humidity' ? parseFloat(value) : value,
       message: message.trim(),
-      locationScope: locationScope,
-      specificLocation: locationScope === 'specific' ? selectedLocation : undefined,
+      location: locationScope === 'specific' ? selectedLocation : 'Todas las ubicaciones',
     };
 
     onAddAlert(newRule);

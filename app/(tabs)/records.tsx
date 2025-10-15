@@ -11,9 +11,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import ExportModal from '../../components/ExportModal';
-import { ProtectedRoute } from '../../components/ProtectedRoute';
-import LiquidGlassCard from '../../components/ui/LiquidGlassCard';
+import { ExportModal } from '../../components/ui/modals';
+import { ProtectedRoute } from '../../components/auth';
+import { LiquidGlassCard } from '../../components/ui/cards';
 import { useTheme } from '../../contexts/ThemeContext';
 import { sensorApi, SensorData } from '../../services/sensorApi';
 
@@ -32,6 +32,20 @@ export default function RecordsScreen() {
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'online' | 'warning' | 'error'>('all');
   const [sensorData, setSensorData] = useState<SensorData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDots, setLoadingDots] = useState('');
+
+  // Animación de puntos para el loading
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setLoadingDots(prev => {
+          if (prev === '...') return '';
+          return prev + '.';
+        });
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [loading]);
   const [refreshing, setRefreshing] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -269,19 +283,16 @@ export default function RecordsScreen() {
     },
     header: {
       padding: 16,
-      paddingTop: 10,
+      paddingTop: 50,
       backgroundColor: 'transparent',
     },
     headerGlass: {
-      borderRadius: 16,
+      borderRadius: 12,
       overflow: 'hidden',
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-      shadowColor: isDark ? '#000000' : '#000000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 8,
+      backgroundColor: isDark ? 'rgba(28, 28, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+      // Sin sombras para que se vea igual al botón
     },
     headerContent: {
       flexDirection: 'row',
@@ -603,7 +614,7 @@ export default function RecordsScreen() {
           <Text style={styles.headerTitle}>Datos de sensores en tiempo real</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Cargando registros...</Text>
+          <Text style={styles.loadingText}>Obteniendo registro{loadingDots}</Text>
         </View>
       </View>
     );
@@ -614,7 +625,11 @@ export default function RecordsScreen() {
       <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerGlass}>
+        <BlurView
+          intensity={isDark ? 20 : 0}
+          tint={isDark ? 'dark' : 'light'}
+          style={styles.headerGlass}
+        >
           <View style={styles.headerContent}>
             <View style={styles.headerIconContainer}>
               <Ionicons name="list-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
@@ -631,7 +646,7 @@ export default function RecordsScreen() {
             <Ionicons name="cloud-upload-outline" size={16} color={isDark ? '#FFFFFF' : '#000000'} />
             <Text style={styles.exportButtonText}>Exportar</Text>
           </TouchableOpacity>
-        </View>
+        </BlurView>
       </View>
 
       {/* Search and Filters Component */}

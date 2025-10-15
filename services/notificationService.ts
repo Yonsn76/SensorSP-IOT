@@ -49,6 +49,7 @@ export interface NotificationRule {
   condition: 'mayor_que' | 'menor_que' | 'igual_a' | 'cambia_a';
   value: number | string;
   message: string;
+  location?: string;
   locationScope?: 'all' | 'specific';
   specificLocation?: string;
   createdAt?: string;
@@ -72,71 +73,7 @@ export interface NotificationStats {
 
 export class NotificationService {
   private static instance: NotificationService;
-  private notificationRules: NotificationRule[] = [
-    {
-      id: 'temp_high',
-      name: 'Temperatura Alta',
-      enabled: false,
-      type: 'temperature',
-      condition: 'mayor_que',
-      value: 40,
-      message: 'Temperatura crítica: {value}°C. Activar ventilación.',
-    },
-    {
-      id: 'temp_low',
-      name: 'Temperatura Baja',
-      enabled: false,
-      type: 'temperature',
-      condition: 'menor_que',
-      value: 0,
-      message: 'Temperatura muy baja: {value}°C. Activar calefacción.',
-    },
-    {
-      id: 'humidity_high',
-      name: 'Humedad Alta',
-      enabled: false,
-      type: 'humidity',
-      condition: 'mayor_que',
-      value: 80,
-      message: 'Humedad alta: {value}%. Verificar sistema.',
-    },
-    {
-      id: 'actuator_ventilador',
-      name: 'Ventilador Activado',
-      enabled: false,
-      type: 'actuator',
-      condition: 'igual_a',
-      value: 'ventilador',
-      message: 'Ventilador activado. Temperatura: {temp}°C',
-    },
-    {
-      id: 'actuator_calefactor',
-      name: 'Calefactor Activado',
-      enabled: false,
-      type: 'actuator',
-      condition: 'igual_a',
-      value: 'calefactor',
-      message: 'Calefactor activado. Temperatura: {temp}°C',
-    },
-    {
-      id: 'status_caliente',
-      name: 'Estado Caliente',
-      enabled: false,
-      type: 'status',
-      condition: 'igual_a',
-      value: 'caliente',
-      message: 'Sistema en estado caliente. Revisar condiciones.',
-    },
-    {
-      id: 'status_frio',
-      name: 'Estado Frío',
-      enabled: false,
-      type: 'status',
-      condition: 'igual_a',
-      value: 'frio',
-      message: 'Sistema en estado frío. Revisar condiciones.',
-    },
-  ];
+  private notificationRules: NotificationRule[] = [];
 
   private lastNotificationTime: { [key: string]: number } = {};
   private readonly NOTIFICATION_COOLDOWN = 0; // Sin cooldown - notificaciones inmediatas
@@ -264,12 +201,70 @@ export class NotificationService {
     return [...this.notificationRules];
   }
 
+  // Cargar notificaciones desde la base de datos
+  async loadNotificationsFromDatabase(userId: string, token: string): Promise<void> {
+    try {
+      console.log('Cargando notificaciones desde la base de datos...');
+      
+      // Importar el servicio de API de notificaciones
+      const { notificationApi } = await import('./notificationApi');
+      
+      // Obtener todas las notificaciones del usuario
+      const response = await notificationApi.getUserNotifications(userId, token);
+      
+      if (response.success && response.data) {
+        // Convertir las notificaciones de la API al formato interno
+        this.notificationRules = response.data.map(notification => ({
+          id: notification.id,
+          name: notification.name,
+          enabled: notification.status === 'active',
+          type: notification.type,
+          condition: notification.condition,
+          value: notification.value,
+          message: notification.message,
+          location: notification.location,
+          createdAt: notification.createdAt,
+          lastTriggered: notification.lastTriggered
+        }));
+        
+        console.log(`Cargadas ${this.notificationRules.length} notificaciones desde la base de datos`);
+      } else {
+        console.log('No se pudieron cargar notificaciones desde la base de datos');
+        this.notificationRules = [];
+      }
+    } catch (error) {
+      console.error('Error cargando notificaciones desde la base de datos:', error);
+      this.notificationRules = [];
+    }
+  }
+
+  // Obtener notificaciones activas
+  getActiveNotifications(): NotificationRule[] {
+    return this.notificationRules.filter(rule => rule.enabled);
+  }
+
   updateNotificationRule(ruleId: string, updates: Partial<NotificationRule>): void {
     const ruleIndex = this.notificationRules.findIndex(rule => rule.id === ruleId);
     if (ruleIndex !== -1) {
       this.notificationRules[ruleIndex] = { ...this.notificationRules[ruleIndex], ...updates };
       console.log(`   Regla de notificación actualizada: ${ruleId}`);
     }
+  }
+
+  // Método para activar/desactivar reglas de notificación
+  toggleNotificationRule(ruleId: string): boolean {
+    const ruleIndex = this.notificationRules.findIndex(rule => rule.id === ruleId);
+    if (ruleIndex !== -1) {
+      this.notificationRules[ruleIndex].enabled = !this.notificationRules[ruleIndex].enabled;
+      console.log(`   Regla ${ruleId} ${this.notificationRules[ruleIndex].enabled ? 'activada' : 'desactivada'}`);
+      return this.notificationRules[ruleIndex].enabled;
+    }
+    return false;
+  }
+
+  // Método para obtener reglas activas
+  getActiveRules(): NotificationRule[] {
+    return this.notificationRules.filter(rule => rule.enabled);
   }
 
   addNotificationRule(rule: NotificationRule): void {
@@ -333,7 +328,7 @@ export class NotificationService {
       
       for (const rule of enabledRules) {
         // Verificar si la regla aplica a esta ubicación
-        if (rule.locationScope === 'specific' && rule.specificLocation !== sensorData.ubicacion) {
+        if (rule.location && rule.location !== 'Todas las ubicaciones' && rule.location !== sensorData.ubicacion) {
           continue; // Saltar si la regla es para una ubicación específica diferente
         }
 
@@ -364,6 +359,10 @@ export class NotificationService {
           const title = rule.name;
           const body = rule.message || this.getDefaultMessage(rule, triggerValue, sensorData.ubicacion || 'Ubicación desconocida');
           
+          // Mostrar alerta en pantalla
+          this.showAlert(title, body);
+          
+          // También enviar notificación push
           await this.scheduleNotification(title, body, {
             ruleId: rule.id,
             sensorId: sensorData.sensorId,
@@ -374,11 +373,33 @@ export class NotificationService {
 
           // Actualizar última vez que se activó
           rule.lastTriggered = new Date().toISOString();
-          console.log(`Notificación activada: ${rule.name} en ${sensorData.ubicacion || 'Ubicación desconocida'}`);
+          console.log(`🚨 Alerta activada: ${rule.name} en ${sensorData.ubicacion || 'Ubicación desconocida'}`);
         }
       }
     } catch (error) {
       console.error('Error al verificar datos del sensor:', error);
+    }
+  }
+
+  private showAlert(title: string, message: string): void {
+    // Importar Alert dinámicamente para evitar problemas de importación
+    try {
+      const { Alert } = require('react-native');
+      Alert.alert(
+        `🚨 ${title}`,
+        message,
+        [
+          {
+            text: 'OK',
+            style: 'default'
+          }
+        ],
+        { cancelable: false }
+      );
+    } catch (error) {
+      console.error('Error showing alert:', error);
+      // Fallback: mostrar en consola
+      console.log(`🚨 ALERTA: ${title} - ${message}`);
     }
   }
 

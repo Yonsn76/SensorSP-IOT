@@ -1,18 +1,19 @@
 import axios from 'axios';
 
-// API Base URL from the original project
-const API_BASE_URL = 'https://iotapi.up.railway.app/api';
+// API Base URL - Local development
+const API_BASE_URL = 'http://localhost:3000/api';
 
-// Types matching the original project
+// Types matching the ESP32 data structure
 export interface SensorData {
   _id: string;
   fecha: string;
   sensorId?: string;
   ubicacion?: string;
-  tipo_sensor?: string;
+  tipo?: string;
+  modelo?: string;
   temperatura: number;
   humedad: number;
-  estado: 'normal' | 'frio' | 'caliente';
+  estado: 'normal' | 'frio' | 'caliente' | 'humedo' | 'seco';
   actuador: string;
 }
 

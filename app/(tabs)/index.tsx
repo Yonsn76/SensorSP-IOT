@@ -13,11 +13,14 @@ import {
   FlatList
 } from 'react-native';
 import { BarChart, LineChart } from 'react-native-chart-kit';
-import { ProtectedRoute } from '../../components/ProtectedRoute';
+import { ProtectedRoute } from '../../components/auth';
 import ScrollableChart from '../../components/ScrollableChart';
-import LiquidGlassCard from '../../components/ui/LiquidGlassCard';
+import { LiquidGlassCard } from '../../components/ui/cards';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useResponsive } from '../../hooks/useResponsive';
+import { Screen, StatCard, Card } from '../../components/ui';
+import { useGlobalStyles } from '../../styles';
 import { notificationService } from '../../services/notificationService';
 import { sensorApi, SensorData, SensorStats } from '../../services/sensorApi';
 import { userPreferencesApi } from '../../services/userPreferencesApi';
@@ -27,6 +30,8 @@ const screenWidth = Dimensions.get('window').width;
 export default function InicioScreen() {
   const { isDark } = useTheme();
   const { user } = useAuth();
+  const { responsiveSizes } = useResponsive();
+  const globalStyles = useGlobalStyles();
   
   const [sensorData, setSensorData] = useState<SensorData[]>([]);
   const [stats, setStats] = useState<SensorStats>({
@@ -44,32 +49,46 @@ export default function InicioScreen() {
   const [selectedSensor, setSelectedSensor] = useState<SensorData | null>(null);
   const [uniqueSensors, setUniqueSensors] = useState<SensorData[]>([]);
   const [showSensorModal, setShowSensorModal] = useState(false);
+  const [loadingDots, setLoadingDots] = useState('');
 
-  const loadPreferredLocationAndSetSensor = async (uniqueSensorsArray: SensorData[], latest: SensorData | null) => {
+  // Animación de puntos para el loading
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setLoadingDots(prev => {
+          if (prev === '...') return '';
+          return prev + '.';
+        });
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [loading]);
+
+  const loadPreferredSensorAndSetSensor = async (uniqueSensorsArray: SensorData[], latest: SensorData | null) => {
     try {
       if (!user?.id || !user?.token) return;
-      
-      // Load preferred location from API
-      const preferredLocation = await userPreferencesApi.getPreferredLocation(user.id, user.token);
-      
-      if (preferredLocation) {
-        // Find sensor with preferred location
-        const preferredSensor = uniqueSensorsArray.find(sensor => sensor.ubicacion === preferredLocation);
+
+      // Load preferred sensor ID from API
+      const preferredSensorId = await userPreferencesApi.getPreferredSensor(user.id, user.token);
+
+      if (preferredSensorId) {
+        // Find sensor with preferred sensor ID
+        const preferredSensor = uniqueSensorsArray.find(sensor => sensor.sensorId === preferredSensorId);
         if (preferredSensor) {
           setSelectedSensor(preferredSensor);
-          console.log(`Using preferred location: ${preferredLocation}`);
+          console.log(`Using preferred sensor: ${preferredSensorId}`);
           return;
         }
       }
-      
-      // Fallback to default logic if no preferred location or sensor not found
+
+      // Fallback to default logic if no preferred sensor or sensor not found
       if (latest && !selectedSensor) {
         setSelectedSensor(latest);
       } else if (uniqueSensorsArray.length > 0 && !selectedSensor) {
         setSelectedSensor(uniqueSensorsArray[0]);
       }
     } catch (error) {
-      console.error('Error loading preferred location:', error);
+      console.error('Error loading preferred sensor:', error);
       // Fallback to default logic
       if (latest && !selectedSensor) {
         setSelectedSensor(latest);
@@ -106,12 +125,29 @@ export default function InicioScreen() {
       const uniqueSensorsArray = Array.from(uniqueSensorMap.values());
       setUniqueSensors(uniqueSensorsArray);
       
-      // Load preferred location and set selected sensor
-      await loadPreferredLocationAndSetSensor(uniqueSensorsArray, latest);
+      // Load preferred sensor and set selected sensor
+      await loadPreferredSensorAndSetSensor(uniqueSensorsArray, latest);
       
-      // Check notifications for latest sensor data
-      if (latest) {
-        notificationService.checkSensorData(latest);
+      // Load user preferences
+      if (user?.id && user?.token) {
+        try {
+          const userPreferences = await userPreferencesApi.getUserPreferences(user.id, user.token);
+          if (userPreferences.success && userPreferences.data) {
+            console.log('Preferencias del usuario cargadas');
+          }
+        } catch (error) {
+          console.error('Error loading user preferences in inicio:', error);
+        }
+      }
+      
+      // Cargar notificaciones desde la base de datos y verificar alertas
+      if (user?.id && user?.token) {
+        await notificationService.loadNotificationsFromDatabase(user.id, user.token);
+        
+        // Check notifications for latest sensor data
+        if (latest) {
+          await notificationService.checkSensorData(latest);
+        }
       }
       
       // Get chart data based on selected time range - Only last hours for dashboard
@@ -147,9 +183,13 @@ export default function InicioScreen() {
       setChartData(chart);
       setWeeklyData(weekly);
       
-      // Check notifications for selected sensor data
-      if (sensor) {
-        await notificationService.checkSensorData(sensor);
+      // Cargar notificaciones y verificar alertas para el sensor seleccionado
+      if (user?.id && user?.token) {
+        await notificationService.loadNotificationsFromDatabase(user.id, user.token);
+        
+        if (sensor) {
+          await notificationService.checkSensorData(sensor);
+        }
       }
       
     } catch (error) {
@@ -335,70 +375,41 @@ export default function InicioScreen() {
   };
 
 
-const styles = StyleSheet.create({
+  const getResponsiveCardStyles = () => {
+    const screenWidth = Dimensions.get('window').width;
+    const isSmallScreen = screenWidth < 375;
+    const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
+    
+    return {
+      statsRow: {
+        flexDirection: 'row' as const,
+        justifyContent: 'center' as const,
+        alignItems: 'center' as const,
+        marginBottom: 12,
+        gap: isSmallScreen ? 4 : isMediumScreen ? 6 : 8,
+        paddingHorizontal: isSmallScreen ? 6 : isMediumScreen ? 8 : 10,
+      },
+      statCard: {
+        flex: isSmallScreen ? 0.42 : isMediumScreen ? 0.40 : 0.38,
+        minHeight: isSmallScreen ? 160 : isMediumScreen ? 170 : 180,
+      },
+      actuatorCard: {
+        flex: isSmallScreen ? 0.60 : isMediumScreen ? 0.55 : 0.50,
+        minHeight: isSmallScreen ? 100 : isMediumScreen ? 110 : 120,
+      },
+    };
+  };
+
+  const responsiveCardStyles = getResponsiveCardStyles();
+
+  const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: isDark ? '#000000' : '#FFFFFF',
     },
-    header: {
-      padding: 16,
-      paddingTop: 10,
-      backgroundColor: 'transparent',
-    },
-    headerGlass: {
-      borderRadius: 16,
-      overflow: 'hidden',
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-      shadowColor: isDark ? '#000000' : '#000000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 8,
-    },
-    headerContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-    },
-    headerIconContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 12,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
-    },
-    headerTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: isDark ? '#FFFFFF' : '#000000',
-      flex: 1,
-      letterSpacing: -0.2,
-    },
-    sensorSelectorButton: {
-      position: 'absolute',
-      bottom: 8,
-      right: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
-      gap: 6,
-    },
-    sensorSelectorText: {
-      fontSize: 14,
-      fontWeight: '500',
-      color: isDark ? '#FFFFFF' : '#000000',
-    },
+    // Header styles moved to useHeaderStyles hook
+    // sensorSelectorButton moved to headerStyles
+    // sensorSelectorText moved to headerStyles
     modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -467,27 +478,16 @@ const styles = StyleSheet.create({
     },
     statsContainer: {
       marginBottom: 24,
-      paddingHorizontal: 4,
+      paddingHorizontal: 0,
     },
-    statsRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 12,
-    },
-    statCard: {
-      flex: 1,
-      marginHorizontal: 5,
-      // Los estilos de Liquid Glass se manejan en el componente base
-    },
-    fullWidthCard: {
-      flex: 1,
-      marginHorizontal: 5,
-    },
+    statsRow: responsiveCardStyles.statsRow,
+    statCard: responsiveCardStyles.statCard,
+    fullWidthCard: responsiveCardStyles.actuatorCard,
     statContent: {
-      padding: 20,
+      padding: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: 120,
+      minHeight: 80,
     },
     statIconContainer: {
       width: 48,
@@ -533,174 +533,64 @@ const styles = StyleSheet.create({
       // Estilos específicos si los necesitas
     },
     // Icon container styles - removed to avoid black squares
-    chartContainer: {
-      borderRadius: 24,
-      overflow: 'hidden',
-      marginBottom: 20,
-      // Liquid Glass effect 100% Apple
-      backgroundColor: isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-      borderWidth: 0.5,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-      // Shadow for depth - Liquid Glass
-      shadowColor: isDark ? '#000000' : '#000000',
-      shadowOffset: {
-        width: 0,
-        height: 12,
-      },
-      shadowOpacity: isDark ? 0.4 : 0.12,
-      shadowRadius: 24,
-      elevation: 12,
-      // Backdrop blur effect
-      backdropFilter: 'blur(20px)',
-      // Optimizado para gráficas deslizables
-      minHeight: 200,
-    },
-    chartContent: {
-      padding: 20,
-    },
-    chartTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: isDark ? '#FFFFFF' : '#000000',
-      marginBottom: 16,
-    },
-    alertCard: {
-      borderRadius: 24,
-      overflow: 'hidden',
-      marginBottom: 10,
-      // Liquid Glass effect 100% Apple
-      backgroundColor: isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-      borderWidth: 0.5,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-      // Shadow for depth - Liquid Glass
-      shadowColor: isDark ? '#000000' : '#000000',
-      shadowOffset: {
-        width: 0,
-        height: 12,
-      },
-      shadowOpacity: isDark ? 0.4 : 0.12,
-      shadowRadius: 24,
-      elevation: 12,
-      // Backdrop blur effect
-      backdropFilter: 'blur(20px)',
-    },
-    alertContent: {
-      padding: 20,
-    },
-        alertTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: isDark ? '#FFFFFF' : '#000000',
-      marginLeft: 8,
-    },
-    alertHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    alertMessage: {
-      fontSize: 14,
-      color: isDark ? '#FFFFFF' : '#000000',
-      lineHeight: 20,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-        loadingText: {
-      fontSize: 16,
-      color: isDark ? '#FFFFFF' : '#000000',
-      marginTop: 16,
-    },
+    // Chart styles now use globalStyles.chartContainer, chartContent, chartTitle
+    // Alert styles now use globalStyles.alertCard, alertContent, alertTitle, alertHeader, alertMessage
+    // Loading styles now use globalStyles.loadingContainer, loadingText
 });
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerSubtitle}>
-            Bienvenido, {user?.username || 'Cargando...'}
-          </Text>
+      <Screen
+        title="Bienvenido"
+        subtitle={user?.username || 'Cargando...'}
+        icon="home-outline"
+        showBlur={false}
+      >
+        <View style={globalStyles.loadingContainer}>
+          <Text style={globalStyles.loadingText}>Obteniendo registro{loadingDots}</Text>
         </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Cargando datos en tiempo real...</Text>
-        </View>
-      </View>
+      </Screen>
     );
   }
 
   return (
     <ProtectedRoute>
-      <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerGlass}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerIconContainer}>
-              <Ionicons name="home-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
-            </View>
-            <Text style={styles.headerTitle}>
-              Bienvenido, {user?.username || 'Cargando...'}
-            </Text>
-          </View>
-          {selectedSensor && uniqueSensors.length > 1 && (
-            <TouchableOpacity
-              style={styles.sensorSelectorButton}
-              onPress={() => setShowSensorModal(true)}
-            >
-              <Ionicons name="hardware-chip-outline" size={16} color={isDark ? '#FFFFFF' : '#000000'} />
-              <Text style={styles.sensorSelectorText}>{selectedSensor.sensorId}</Text>
-              <Ionicons name="chevron-down-outline" size={14} color={isDark ? '#FFFFFF' : '#000000'} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      <ScrollView 
-        style={styles.scrollContent} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+      <Screen
+        title="Bienvenido"
+        subtitle={user?.username || 'Cargando...'}
+        icon="home-outline"
+        rightButton={selectedSensor && uniqueSensors.length > 1 ? {
+          icon: 'hardware-chip-outline',
+          text: selectedSensor.sensorId || 'Sensor',
+          onPress: () => setShowSensorModal(true)
+        } : undefined}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       >
+
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
           {/* First Row - Temperature and Humidity */}
           <View style={styles.statsRow}>
-            <LiquidGlassCard style={[styles.statCard, styles.temperatureCard]}>
-              <View style={styles.statContent}>
-                <View style={styles.statIconContainer}>
-                  <Ionicons 
-                    name="thermometer" 
-                    size={32} 
-                    color={isDark ? '#FFFFFF' : '#000000'} 
-                  />
-                </View>
-                <Text style={styles.statValue}>
-                  {selectedSensor ? `${selectedSensor.temperatura}°C` : 'N/A'}
-                </Text>
-                <Text style={styles.statLabel}>Temperatura</Text>
-                <Text style={styles.statSubtitle}>{selectedSensor ? selectedSensor.sensorId : 'Actual'}</Text>
-              </View>
-            </LiquidGlassCard>
+            <StatCard
+              title="Temperatura"
+              value={selectedSensor ? `${selectedSensor.temperatura}°C` : 'N/A'}
+              icon="thermometer"
+              variant="highlighted"
+              size={screenWidth < 375 ? "medium" : "large"}
+              padding="small"
+              style={responsiveCardStyles.statCard}
+            />
 
-            <LiquidGlassCard style={[styles.statCard, styles.humidityCard]}>
-              <View style={styles.statContent}>
-                <View style={styles.statIconContainer}>
-                  <Ionicons 
-                    name="water" 
-                    size={32} 
-                    color={isDark ? '#FFFFFF' : '#000000'} 
-                  />
-                </View>
-                <Text style={styles.statValue}>
-                  {selectedSensor ? `${selectedSensor.humedad}%` : 'N/A'}
-                </Text>
-                <Text style={styles.statLabel}>Humedad</Text>
-                <Text style={styles.statSubtitle}>{selectedSensor ? selectedSensor.sensorId : 'Actual'}</Text>
-              </View>
-            </LiquidGlassCard>
+            <StatCard
+              title="Humedad"
+              value={selectedSensor ? `${selectedSensor.humedad}%` : 'N/A'}
+              icon="water"
+              variant="highlighted"
+              size={screenWidth < 375 ? "medium" : "large"}
+              padding="small"
+              style={responsiveCardStyles.statCard}
+            />
           </View>
 
           {/* Second Row - Actuator (Full Width) */}
@@ -710,7 +600,7 @@ const styles = StyleSheet.create({
                 <View style={styles.statIconContainer}>
                   <Ionicons 
                     name="settings" 
-                    size={32} 
+                    size={24} 
                     color={isDark ? '#FFFFFF' : '#000000'} 
                   />
                 </View>
@@ -728,10 +618,10 @@ const styles = StyleSheet.create({
         <BlurView
           intensity={isDark ? 20 : 30}
           tint={isDark ? 'dark' : 'light'}
-          style={styles.chartContainer}
+          style={globalStyles.chartContainer}
         >
-          <View style={styles.chartContent}>
-            <Text style={styles.chartTitle}>
+          <View style={globalStyles.chartContent}>
+            <Text style={globalStyles.chartTitle}>
               Temperatura (Últimas 6 horas) - {selectedSensor ? selectedSensor.sensorId : 'Todos'} - {getDataInfo(chartData.length)}
             </Text>
             {getTemperatureData().datasets[0].data.length > 0 ? (
@@ -754,7 +644,7 @@ const styles = StyleSheet.create({
                 />
               </ScrollableChart>
             ) : (
-              <Text style={styles.loadingText}>No hay datos disponibles</Text>
+              <Text style={globalStyles.loadingText}>No hay datos disponibles</Text>
             )}
           </View>
         </BlurView>
@@ -763,10 +653,10 @@ const styles = StyleSheet.create({
         <BlurView
           intensity={isDark ? 20 : 30}
           tint={isDark ? 'dark' : 'light'}
-          style={styles.chartContainer}
+          style={globalStyles.chartContainer}
         >
-          <View style={styles.chartContent}>
-            <Text style={styles.chartTitle}>
+          <View style={globalStyles.chartContent}>
+            <Text style={globalStyles.chartTitle}>
               Humedad (Últimas 6 horas) - {selectedSensor ? selectedSensor.sensorId : 'Todos'} - {getDataInfo(weeklyData.length)}
             </Text>
             {getHumidityData().datasets[0].data.length > 0 ? (
@@ -790,20 +680,20 @@ const styles = StyleSheet.create({
                 />
               </ScrollableChart>
             ) : (
-              <Text style={styles.loadingText}>No hay datos disponibles</Text>
+              <Text style={globalStyles.loadingText}>No hay datos disponibles</Text>
             )}
           </View>
         </BlurView>
 
         {/* Alerts */}
         {selectedSensor && selectedSensor.estado === 'caliente' && (
-          <View style={styles.alertCard}>
-            <View style={styles.alertContent}>
-              <View style={styles.alertHeader}>
+          <View style={globalStyles.alertCard}>
+            <View style={globalStyles.alertContent}>
+              <View style={globalStyles.alertHeader}>
                 <Ionicons name="flame" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-                <Text style={styles.alertTitle}>Estado Caliente</Text>
+                <Text style={globalStyles.alertTitle}>Estado Caliente</Text>
               </View>
-              <Text style={styles.alertMessage}>
+              <Text style={globalStyles.alertMessage}>
                 El sensor está en estado caliente. Temperatura: {selectedSensor.temperatura}°C, Humedad: {selectedSensor.humedad}%
               </Text>
             </View>
@@ -811,13 +701,13 @@ const styles = StyleSheet.create({
         )}
 
         {selectedSensor && selectedSensor.estado === 'frio' && (
-          <View style={styles.alertCard}>
-            <View style={styles.alertContent}>
-              <View style={styles.alertHeader}>
+          <View style={globalStyles.alertCard}>
+            <View style={globalStyles.alertContent}>
+              <View style={globalStyles.alertHeader}>
                 <Ionicons name="snow" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-                <Text style={styles.alertTitle}>Estado Frío</Text>
+                <Text style={globalStyles.alertTitle}>Estado Frío</Text>
               </View>
-              <Text style={styles.alertMessage}>
+              <Text style={globalStyles.alertMessage}>
                 El sensor está en estado frío. Temperatura: {selectedSensor.temperatura}°C, Humedad: {selectedSensor.humedad}%
               </Text>
             </View>
@@ -825,13 +715,13 @@ const styles = StyleSheet.create({
         )}
 
         {selectedSensor && selectedSensor.temperatura > 40 && (
-          <View style={styles.alertCard}>
-            <View style={styles.alertContent}>
-              <View style={styles.alertHeader}>
+          <View style={globalStyles.alertCard}>
+            <View style={globalStyles.alertContent}>
+              <View style={globalStyles.alertHeader}>
                 <Ionicons name="warning" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-                <Text style={styles.alertTitle}>Temperatura Muy Alta</Text>
+                <Text style={globalStyles.alertTitle}>Temperatura Muy Alta</Text>
               </View>
-              <Text style={styles.alertMessage}>
+              <Text style={globalStyles.alertMessage}>
                 La temperatura ha superado los 40°C. Activar ventilación inmediatamente.
               </Text>
             </View>
@@ -839,13 +729,13 @@ const styles = StyleSheet.create({
         )}
 
         {selectedSensor && selectedSensor.temperatura < 0 && (
-          <View style={styles.alertCard}>
-            <View style={styles.alertContent}>
-              <View style={styles.alertHeader}>
+          <View style={globalStyles.alertCard}>
+            <View style={globalStyles.alertContent}>
+              <View style={globalStyles.alertHeader}>
                 <Ionicons name="thermometer" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-                <Text style={styles.alertTitle}>Temperatura Muy Baja</Text>
+                <Text style={globalStyles.alertTitle}>Temperatura Muy Baja</Text>
               </View>
-              <Text style={styles.alertMessage}>
+              <Text style={globalStyles.alertMessage}>
                 La temperatura está por debajo de 0°C. Activar calefacción.
               </Text>
             </View>
@@ -853,19 +743,19 @@ const styles = StyleSheet.create({
         )}
 
         {selectedSensor && selectedSensor.humedad > 80 && (
-          <View style={styles.alertCard}>
-            <View style={styles.alertContent}>
-              <View style={styles.alertHeader}>
+          <View style={globalStyles.alertCard}>
+            <View style={globalStyles.alertContent}>
+              <View style={globalStyles.alertHeader}>
                 <Ionicons name="water" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-                <Text style={styles.alertTitle}>Humedad Alta</Text>
+                <Text style={globalStyles.alertTitle}>Humedad Alta</Text>
               </View>
-              <Text style={styles.alertMessage}>
+              <Text style={globalStyles.alertMessage}>
                 La humedad ha superado el 80%. Verificar sistema de deshumidificación.
               </Text>
             </View>
           </View>
         )}
-      </ScrollView>
+      </Screen>
 
       {/* Sensor Selection Modal */}
       <Modal
@@ -874,18 +764,18 @@ const styles = StyleSheet.create({
         animationType="slide"
         onRequestClose={() => setShowSensorModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={globalStyles.modalOverlay}>
           <TouchableOpacity 
-            style={styles.modalBackdrop} 
+            style={globalStyles.modalBackdrop} 
             activeOpacity={1} 
             onPress={() => setShowSensorModal(false)}
           />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Seleccionar Sensor</Text>
+          <View style={globalStyles.modalContent}>
+            <View style={globalStyles.modalHeader}>
+              <Text style={globalStyles.modalTitle}>Seleccionar Sensor</Text>
               <TouchableOpacity 
                 onPress={() => setShowSensorModal(false)}
-                style={styles.modalCloseButton}
+                style={globalStyles.modalCloseButton}
               >
                 <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
               </TouchableOpacity>
@@ -897,23 +787,23 @@ const styles = StyleSheet.create({
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
-                    styles.sensorOption,
-                    selectedSensor?.sensorId === item.sensorId && styles.selectedSensorOption
+                    globalStyles.sensorOption,
+                    selectedSensor?.sensorId === item.sensorId && globalStyles.selectedSensorOption
                   ]}
                   onPress={() => {
                     setSelectedSensor(item);
                     setShowSensorModal(false);
                   }}
                 >
-                  <View style={styles.sensorOptionContent}>
+                  <View style={globalStyles.sensorOptionContent}>
                     <Ionicons 
                       name="location-outline" 
                       size={20} 
                       color={isDark ? '#FFFFFF' : '#000000'} 
                     />
-                    <View style={styles.sensorOptionInfo}>
-                      <Text style={styles.sensorOptionLocation}>{item.ubicacion}</Text>
-                      <Text style={styles.sensorOptionId}>ID: {item.sensorId}</Text>
+                    <View style={globalStyles.sensorOptionInfo}>
+                      <Text style={globalStyles.sensorOptionLocation}>{item.ubicacion}</Text>
+                      <Text style={globalStyles.sensorOptionId}>ID: {item.sensorId}</Text>
                     </View>
                     {selectedSensor?.sensorId === item.sensorId && (
                       <Ionicons 
@@ -930,7 +820,6 @@ const styles = StyleSheet.create({
           </View>
         </View>
       </Modal>
-      </View>
     </ProtectedRoute>
   );
 }

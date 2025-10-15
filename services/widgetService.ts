@@ -29,25 +29,25 @@ export class WidgetService {
         return cachedData.data;
       }
 
-      // Obtener ubicación preferida
-      const preferredLocation = await userPreferencesApi.getPreferredLocation(userId, token);
+      // Obtener sensor preferido
+      const preferredSensorId = await userPreferencesApi.getPreferredSensor(userId, token);
       
       // Obtener datos del sensor preferido
       const allSensors = await sensorApi.getAllSensors();
-      const preferredSensor = allSensors.find(s => s.ubicacion === preferredLocation);
+      const preferredSensor = allSensors.find(s => s.sensorId === preferredSensorId);
       
       if (!preferredSensor) {
         const fallbackData: WidgetData = {
           temperature: 'N/A',
           humidity: 'N/A',
           status: 'Sin datos',
-          location: 'No disponible',
+          location: preferredSensorId ? `Sensor ${preferredSensorId} no encontrado` : 'No hay sensor preferido',
           actuator: 'N/A',
           lastUpdate: 'Nunca',
           alerts: 0,
           isOnline: false,
           statusColor: '#888888',
-          statusIcon: '❓'
+          statusIcon: 'help-circle'
         };
         
         await this.cacheData(fallbackData);

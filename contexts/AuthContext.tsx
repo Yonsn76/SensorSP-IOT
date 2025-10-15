@@ -128,8 +128,8 @@ const initialState: AuthState = {
   isSessionRestored: false,
 };
 
-// API Base URL
-const API_BASE_URL = 'https://iotapi.up.railway.app/api';
+// API Base URL - Local development
+const API_BASE_URL = 'http://localhost:3000/api';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);

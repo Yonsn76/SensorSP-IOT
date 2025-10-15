@@ -1,27 +1,22 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://iotapi.up.railway.app/api/user-preferences';
+const API_BASE_URL = 'http://localhost:3000/api/user-preferences';
 
 export interface UserPreferences {
   userId: string;
-  username: string;
-  email: string;
-  preferredLocation: string | null;
-  customNotifications: any[];
-  activeNotifications: any[];
+  preferredSensorId: string | null;
+  myNotificationIds: string[];
   totalNotifications: number;
-  lastUpdated: string;
+  theme: 'light' | 'dark' | 'auto';
+  updatedAt: string;
 }
 
 export interface SavePreferencesRequest {
   userId: string;
-  username: string;
-  email: string;
-  preferredLocation: string | null;
-  customNotifications: any[];
-  activeNotifications: any[];
+  preferredSensorId: string | null;
+  myNotificationIds: string[];
   totalNotifications: number;
-  lastUpdated: string;
+  theme: 'light' | 'dark' | 'auto';
 }
 
 export interface ApiResponse<T> {
@@ -73,25 +68,25 @@ class UserPreferencesApi {
     }
   }
 
-  // GET - Obtener solo la ubicación preferida del usuario (endpoint optimizado)
-  async getPreferredLocation(userId: string, token: string): Promise<string | null> {
+  // GET - Obtener solo el sensor preferido del usuario (endpoint optimizado)
+  async getPreferredSensor(userId: string, token: string): Promise<string | null> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/${userId}/location`, {
+      const response = await axios.get(`${API_BASE_URL}/${userId}/sensor`, {
         headers: this.getAuthHeaders(token)
       });
       
       if (response.data.success && response.data.data) {
-        return response.data.data.preferredLocation;
+        return response.data.data.preferredSensorId;
       }
       return null;
     } catch (error: any) {
-      console.error('Error getting preferred location:', error);
+      console.error('Error getting preferred sensor:', error);
       return null;
     }
   }
 
   // GET - Obtener todas las preferencias (para administración)
-  async getAllUserPreferences(token: string, page: number = 1, limit: number = 10, sortBy: string = 'lastUpdated', sortOrder: string = 'desc'): Promise<ApiResponse<{ data: UserPreferences[], pagination: any }>> {
+  async getAllUserPreferences(token: string, page: number = 1, limit: number = 10, sortBy: string = 'updatedAt', sortOrder: string = 'desc'): Promise<ApiResponse<{ data: UserPreferences[], pagination: any }>> {
     try {
       const response = await axios.get(API_BASE_URL, {
         headers: this.getAuthHeaders(token),

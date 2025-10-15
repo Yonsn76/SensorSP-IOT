@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, StyleSheet, View, ViewProps } from 'react-native';
-import { useTheme } from '../../contexts/ThemeContext';
-import LiquidGlassCard from './LiquidGlassCard';
+import { useTheme } from '../../../contexts/ThemeContext';
+import { LiquidGlassCard } from '../cards';
 
 interface LiquidGlassModalProps extends ViewProps {
   visible: boolean;

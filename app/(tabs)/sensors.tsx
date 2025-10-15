@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ProtectedRoute } from '../../components/ProtectedRoute';
+import { ProtectedRoute } from '../../components/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { sensorApi, SensorData } from '../../services/sensorApi';
@@ -32,6 +32,20 @@ export default function SensorsScreen() {
   
   const [sensors, setSensors] = useState<SensorInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDots, setLoadingDots] = useState('');
+
+  // Animación de puntos para el loading
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setLoadingDots(prev => {
+          if (prev === '...') return '';
+          return prev + '.';
+        });
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [loading]);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadSensors = async () => {
@@ -135,19 +149,16 @@ export default function SensorsScreen() {
     },
     header: {
       padding: 16,
-      paddingTop: 10,
+      paddingTop: 50,
       backgroundColor: 'transparent',
     },
     headerGlass: {
-      borderRadius: 16,
+      borderRadius: 12,
       overflow: 'hidden',
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-      shadowColor: isDark ? '#000000' : '#000000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 8,
+      backgroundColor: isDark ? 'rgba(28, 28, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+      // Sin sombras para que se vea igual al botón
     },
     headerContent: {
       flexDirection: 'row',
@@ -293,7 +304,7 @@ export default function SensorsScreen() {
             </Text>
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Cargando sensores...</Text>
+          <Text style={styles.loadingText}>Obteniendo registro{loadingDots}</Text>
         </View>
       </View>
     );
@@ -307,14 +318,18 @@ export default function SensorsScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerGlass}>
+          <BlurView
+            intensity={isDark ? 20 : 0}
+            tint={isDark ? 'dark' : 'light'}
+            style={styles.headerGlass}
+          >
             <View style={styles.headerContent}>
               <View style={styles.headerIconContainer}>
                 <Ionicons name="hardware-chip-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
               </View>
               <Text style={styles.headerTitle}>Dispositivos IoT conectados</Text>
             </View>
-          </View>
+          </BlurView>
         </View>
 
         <ScrollView 

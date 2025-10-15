@@ -11,11 +11,12 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import AddAlertModal from '../../components/AddAlertModal';
-import { ProtectedRoute } from '../../components/ProtectedRoute';
+import { AddAlertModal } from '../../components/ui/modals';
+import { ProtectedRoute } from '../../components/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { NotificationRule, notificationService } from '../../services/notificationService';
+import { notificationApi, Notification } from '../../services/notificationApi';
+import { notificationService } from '../../services/notificationService';
 
 export default function NotificationsScreen() {
   const { isDark } = useTheme();
@@ -32,9 +33,23 @@ export default function NotificationsScreen() {
     return translations[condition] || condition;
   };
   
-  const [notificationRules, setNotificationRules] = useState<NotificationRule[]>([]);
+  const [notificationRules, setNotificationRules] = useState<Notification[]>([]);
   const [notificationHistory, setNotificationHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDots, setLoadingDots] = useState('');
+
+  // Animación de puntos para el loading
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setLoadingDots(prev => {
+          if (prev === '...') return '';
+          return prev + '.';
+        });
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [loading]);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -43,17 +58,25 @@ export default function NotificationsScreen() {
       setLoading(true);
       console.log('Loading notifications...');
       
-      // Load notification rules
-      const rules = notificationService.getNotificationRules();
-      setNotificationRules(rules);
+      if (!user?.id || !user?.token) {
+        console.error('Usuario no autenticado');
+        return;
+      }
+
+      // Obtener notificaciones desde la API
+      const response = await notificationApi.getUserNotifications(user.id, user.token);
       
-      // Load notification history
-      const history = await notificationService.getNotificationHistory();
-      setNotificationHistory(history);
+      if (response.success && response.data) {
+        setNotificationRules(response.data);
+        console.log('   Notifications loaded successfully from API');
+      } else {
+        console.error('Error loading notifications:', response.message);
+        Alert.alert('Error', 'No se pudieron cargar las notificaciones');
+      }
       
-      console.log('   Notifications loaded successfully');
     } catch (error) {
       console.error('  Error loading notifications:', error);
+      Alert.alert('Error', 'Error al cargar las notificaciones');
     } finally {
       setLoading(false);
     }
@@ -65,28 +88,7 @@ export default function NotificationsScreen() {
     setRefreshing(false);
   };
 
-  const toggleNotificationRule = (ruleId: string, enabled: boolean) => {
-    notificationService.updateNotificationRule(ruleId, { enabled });
-    setNotificationRules(notificationService.getNotificationRules());
-  };
-
-  const deleteNotificationRule = (ruleId: string) => {
-    Alert.alert(
-      'Eliminar Alerta',
-      '¿Estás seguro de que quieres eliminar esta alerta?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            notificationService.removeNotificationRule(ruleId);
-            setNotificationRules(notificationService.getNotificationRules());
-          },
-        },
-      ]
-    );
-  };
+  // Las funciones toggleNotification y deleteNotification ya están definidas arriba
 
   const clearAllNotifications = async () => {
     Alert.alert(
@@ -106,28 +108,108 @@ export default function NotificationsScreen() {
     );
   };
 
-  const testNotification = async () => {
+
+  const toggleNotification = async (notification: Notification) => {
     try {
-      await notificationService.scheduleNotification(
-        'Prueba de Notificación',
-        'Esta es una notificación de prueba del sistema IoT',
-        { test: true }
-      );
-              Alert.alert('Notificación enviada', 'La notificación de prueba se ha enviado correctamente.');
+      if (!user?.id || !user?.token) {
+        Alert.alert('Error', 'Usuario no autenticado');
+        return;
+      }
+
+      let response;
+      if (notification.status === 'active') {
+        // Desactivar notificación
+        response = await notificationApi.deactivateNotification(notification.id, user.id, user.token);
+      } else {
+        // Activar notificación
+        response = await notificationApi.activateNotification(notification.id, user.id, user.token);
+      }
+
+      if (response.success) {
+        // Recargar notificaciones
+        await loadNotifications();
+        Alert.alert('Éxito', `Notificación ${notification.status === 'active' ? 'desactivada' : 'activada'} correctamente`);
+      } else {
+        Alert.alert('Error', response.message || 'No se pudo cambiar el estado de la notificación');
+      }
     } catch (error) {
-              Alert.alert('Error', 'No se pudo enviar la notificación de prueba.');
+      console.error('Error toggling notification:', error);
+      Alert.alert('Error', 'Error al cambiar el estado de la notificación');
     }
   };
 
-  const handleAddAlert = (newRule: NotificationRule) => {
-    notificationService.addNotificationRule(newRule);
-    setNotificationRules(notificationService.getNotificationRules());
-            Alert.alert('Alerta Agregada', 'La nueva alerta se ha agregado correctamente.');
+  const deleteNotification = async (notification: Notification) => {
+    try {
+      if (!user?.id || !user?.token) {
+        Alert.alert('Error', 'Usuario no autenticado');
+        return;
+      }
+
+      const response = await notificationApi.deleteNotification(notification.id, user.id, user.token);
+
+      if (response.success) {
+        // Recargar notificaciones
+        await loadNotifications();
+        Alert.alert('Éxito', 'Notificación eliminada correctamente');
+      } else {
+        Alert.alert('Error', response.message || 'No se pudo eliminar la notificación');
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      Alert.alert('Error', 'Error al eliminar la notificación');
+    }
+  };
+
+  const handleAddAlert = async (newRule: any) => {
+    try {
+      if (!user?.id || !user?.token) {
+        Alert.alert('Error', 'Usuario no autenticado');
+        return;
+      }
+
+      console.log('📝 Datos a enviar:', {
+        userId: user.id,
+        name: newRule.name,
+        type: newRule.type,
+        condition: newRule.condition,
+        value: newRule.value,
+        message: newRule.message,
+        location: newRule.location || 'Todas las ubicaciones'
+      });
+
+      // Crear notificación en la API
+      const response = await notificationApi.createNotification({
+        userId: user.id,
+        name: newRule.name,
+        type: newRule.type,
+        condition: newRule.condition,
+        value: newRule.value,
+        message: newRule.message,
+        location: newRule.location || 'Todas las ubicaciones'
+      }, user.token);
+
+      console.log('📡 Respuesta de la API:', response);
+
+      if (response.success) {
+        // Recargar notificaciones desde la API
+        await loadNotifications();
+        Alert.alert('Alerta Agregada', 'La nueva alerta se ha agregado correctamente a la base de datos.');
+      } else {
+        Alert.alert('Error', response.message || 'No se pudo agregar la alerta');
+      }
+    } catch (error) {
+      console.error('Error adding alert:', error);
+      Alert.alert('Error', 'Error al agregar la alerta');
+    }
   };
 
   useEffect(() => {
     loadNotifications();
-  }, []);
+    // Cargar notificaciones en el servicio de notificaciones
+    if (user?.id && user?.token) {
+      notificationService.loadNotificationsFromDatabase(user.id, user.token);
+    }
+  }, [user]);
 
   const styles = StyleSheet.create({
     container: {
@@ -136,19 +218,16 @@ export default function NotificationsScreen() {
     },
     header: {
       padding: 16,
-      paddingTop: 10,
+      paddingTop: 50,
       backgroundColor: 'transparent',
     },
     headerGlass: {
-      borderRadius: 16,
+      borderRadius: 12,
       overflow: 'hidden',
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-      shadowColor: isDark ? '#000000' : '#000000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 8,
+      backgroundColor: isDark ? 'rgba(28, 28, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+      // Sin sombras para que se vea igual al botón
     },
     headerContent: {
       flexDirection: 'row',
@@ -197,69 +276,104 @@ export default function NotificationsScreen() {
       marginBottom: 16,
     },
     ruleItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.7)',
+      borderRadius: 16,
+      marginBottom: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+      shadowColor: isDark ? '#000000' : '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.3 : 0.1,
+      shadowRadius: 8,
+      elevation: 3,
     },
     ruleItemLast: {
-      borderBottomWidth: 0,
+      marginBottom: 0,
     },
     ruleInfo: {
       flex: 1,
-      marginRight: 16,
+    },
+    ruleHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 8,
     },
     ruleName: {
-      fontSize: 16,
-      fontWeight: '600',
+      fontSize: 18,
+      fontWeight: '700',
       color: isDark ? '#FFFFFF' : '#1D1D1F',
-      marginBottom: 4,
+      letterSpacing: -0.3,
+      flex: 1,
+      marginRight: 12,
     },
     ruleDescription: {
-      fontSize: 14,
-      color: isDark ? '#FFFFFF' : '#000000',
-      marginBottom: 4,
+      fontSize: 15,
+      color: isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(29, 29, 31, 0.7)',
+      marginBottom: 8,
+      lineHeight: 20,
+      fontWeight: '500',
     },
     ruleLocation: {
-      fontSize: 12,
+      fontSize: 13,
       color: isDark ? '#8E8E93' : '#6D6D70',
-      marginBottom: 4,
+      marginBottom: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      fontWeight: '500',
     },
     ruleStatus: {
       fontSize: 12,
-      color: isDark ? '#FFFFFF' : '#000000',
+      color: isDark ? '#8E8E93' : '#6D6D70',
+      flexDirection: 'row',
+      alignItems: 'center',
+      fontWeight: '600',
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+      borderRadius: 6,
+      alignSelf: 'flex-start',
     },
     ruleLastTriggered: {
-      fontSize: 11,
+      fontSize: 12,
       color: isDark ? '#8E8E93' : '#6D6D70',
-      marginTop: 2,
+      marginBottom: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      fontWeight: '500',
     },
     ruleMessage: {
-      fontSize: 11,
-      color: isDark ? '#8E8E93' : '#6D6D70',
-      marginTop: 2,
+      fontSize: 12,
+      color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(29, 29, 31, 0.6)',
+      marginBottom: 6,
       fontStyle: 'italic',
+      flexDirection: 'row',
+      alignItems: 'center',
+      lineHeight: 16,
     },
     ruleActions: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'flex-end',
       gap: 12,
+      marginTop: 8,
     },
     deleteButton: {
       padding: 8,
+      borderRadius: 8,
+      backgroundColor: isDark ? 'rgba(255, 59, 48, 0.1)' : 'rgba(255, 59, 48, 0.1)',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 59, 48, 0.3)' : 'rgba(255, 59, 48, 0.3)',
     },
     actionButtons: {
-      flexDirection: 'row',
-      gap: 12,
       marginBottom: 20,
     },
     actionButton: {
-      flex: 1,
       backgroundColor: isDark ? 'rgba(28, 28, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)',
       borderRadius: 12,
       paddingVertical: 16,
+      paddingHorizontal: 20,
       alignItems: 'center',
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
@@ -305,6 +419,7 @@ export default function NotificationsScreen() {
     emptyState: {
       alignItems: 'center',
       paddingVertical: 40,
+      paddingHorizontal: 20,
     },
     emptyStateIcon: {
       fontSize: 48,
@@ -313,8 +428,10 @@ export default function NotificationsScreen() {
     },
     emptyStateText: {
       fontSize: 16,
-      color: isDark ? '#FFFFFF' : '#000000',
+      color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(29, 29, 31, 0.6)',
       textAlign: 'center',
+      fontWeight: '500',
+      lineHeight: 22,
     },
     statsContainer: {
       flexDirection: 'row',
@@ -352,28 +469,32 @@ export default function NotificationsScreen() {
           </Text>
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Cargando notificaciones...</Text>
+          <Text style={styles.loadingText}>Obteniendo registro{loadingDots}</Text>
         </View>
       </View>
     );
   }
 
-  const enabledRules = notificationRules.filter(rule => rule.enabled);
-  const disabledRules = notificationRules.filter(rule => !rule.enabled);
+  const enabledRules = notificationRules.filter(rule => rule.status === 'active');
+  const disabledRules = notificationRules.filter(rule => rule.status === 'inactive');
 
   return (
     <ProtectedRoute>
       <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerGlass}>
+        <BlurView
+          intensity={isDark ? 20 : 0}
+          tint={isDark ? 'dark' : 'light'}
+          style={styles.headerGlass}
+        >
           <View style={styles.headerContent}>
             <View style={styles.headerIconContainer}>
               <Ionicons name="notifications-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
             </View>
             <Text style={styles.headerTitle}>Avisos del sistema</Text>
           </View>
-        </View>
+        </BlurView>
       </View>
 
       <ScrollView 
@@ -407,12 +528,6 @@ export default function NotificationsScreen() {
               {' '}Agregar Alerta
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={testNotification}>
-            <Text style={styles.actionButtonText}>
-              <Ionicons name="notifications-outline" size={18} color={isDark ? '#FFFFFF' : '#000000'} />
-              {' '}Probar
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* Active Notification Rules */}
@@ -437,36 +552,42 @@ export default function NotificationsScreen() {
                   ]}
                 >
                   <View style={styles.ruleInfo}>
-                    <Text style={styles.ruleName}>{rule.name}</Text>
+                    <View style={styles.ruleHeader}>
+                      <Text style={styles.ruleName}>{rule.name}</Text>
+                      <Text style={styles.ruleStatus}>
+                        {rule.status === 'active' ? (
+                          <>
+                            <Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
+                            {' '}Activa
+                          </>
+                        ) : (
+                          <>
+                            <Ionicons name="pause-circle" size={12} color="#FF9800" />
+                            {' '}Inactiva
+                          </>
+                        )}
+                      </Text>
+                    </View>
+                    
                     <Text style={styles.ruleDescription}>
                       {rule.type === 'temperature' && `${translateCondition(rule.condition)} ${rule.value}°C`}
                       {rule.type === 'humidity' && `${translateCondition(rule.condition)} ${rule.value}%`}
                       {rule.type === 'actuator' && `${translateCondition(rule.condition)} ${rule.value}`}
                       {rule.type === 'status' && `${translateCondition(rule.condition)} ${rule.value}`}
                     </Text>
+                    
                     <Text style={styles.ruleLocation}>
-                      <Ionicons name={rule.locationScope === 'all' ? 'globe-outline' : 'location-outline'} size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
-                      {' '}{rule.locationScope === 'all' ? 'Todas las ubicaciones' : rule.specificLocation || 'Ubicación específica'}
+                      <Ionicons name="location-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
+                      {' '}{rule.location || 'Todas las ubicaciones'}
                     </Text>
-                    <Text style={styles.ruleStatus}>
-                      {rule.id.startsWith('custom_') ? (
-                        <>
-                          <Ionicons name="construct-outline" size={12} color={isDark ? '#FFFFFF' : '#000000'} />
-                          {' '}Personalizada
-                        </>
-                      ) : (
-                        <>
-                          <Ionicons name="settings-outline" size={12} color={isDark ? '#FFFFFF' : '#000000'} />
-                          {' '}Predefinida
-                        </>
-                      )}
-                    </Text>
+                    
                     {rule.lastTriggered && (
                       <Text style={styles.ruleLastTriggered}>
                         <Ionicons name="time-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
                         {' '}Última activación: {new Date(rule.lastTriggered).toLocaleString()}
                       </Text>
                     )}
+                    
                     {rule.message && (
                       <Text style={styles.ruleMessage}>
                         <Ionicons name="chatbubble-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
@@ -474,17 +595,18 @@ export default function NotificationsScreen() {
                       </Text>
                     )}
                   </View>
+                  
                   <View style={styles.ruleActions}>
                     <Switch
-                      value={rule.enabled}
-                      onValueChange={(enabled) => toggleNotificationRule(rule.id, enabled)}
+                      value={rule.status === 'active'}
+                      onValueChange={() => toggleNotification(rule)}
                       trackColor={{ false: '#767577', true: isDark ? '#0A84FF' : '#007AFF' }}
-                      thumbColor={rule.enabled ? '#FFFFFF' : '#f4f3f4'}
+                      thumbColor={rule.status === 'active' ? '#FFFFFF' : '#f4f3f4'}
                     />
-                    {rule.id.startsWith('custom_') && (
+                    {rule.status === 'inactive' && (
                       <TouchableOpacity 
                         style={styles.deleteButton}
-                        onPress={() => deleteNotificationRule(rule.id)}
+                        onPress={() => deleteNotification(rule)}
                       >
                         <Ionicons name="trash-outline" size={16} color="#FF3B30" />
                       </TouchableOpacity>
@@ -523,36 +645,42 @@ export default function NotificationsScreen() {
                   ]}
                 >
                   <View style={styles.ruleInfo}>
-                    <Text style={styles.ruleName}>{rule.name}</Text>
+                    <View style={styles.ruleHeader}>
+                      <Text style={styles.ruleName}>{rule.name}</Text>
+                      <Text style={styles.ruleStatus}>
+                        {rule.status === 'active' ? (
+                          <>
+                            <Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
+                            {' '}Activa
+                          </>
+                        ) : (
+                          <>
+                            <Ionicons name="pause-circle" size={12} color="#FF9800" />
+                            {' '}Inactiva
+                          </>
+                        )}
+                      </Text>
+                    </View>
+                    
                     <Text style={styles.ruleDescription}>
                       {rule.type === 'temperature' && `${translateCondition(rule.condition)} ${rule.value}°C`}
                       {rule.type === 'humidity' && `${translateCondition(rule.condition)} ${rule.value}%`}
                       {rule.type === 'actuator' && `${translateCondition(rule.condition)} ${rule.value}`}
                       {rule.type === 'status' && `${translateCondition(rule.condition)} ${rule.value}`}
                     </Text>
+                    
                     <Text style={styles.ruleLocation}>
-                      <Ionicons name={rule.locationScope === 'all' ? 'globe-outline' : 'location-outline'} size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
-                      {' '}{rule.locationScope === 'all' ? 'Todas las ubicaciones' : rule.specificLocation || 'Ubicación específica'}
+                      <Ionicons name="location-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
+                      {' '}{rule.location || 'Todas las ubicaciones'}
                     </Text>
-                    <Text style={styles.ruleStatus}>
-                      {rule.id.startsWith('custom_') ? (
-                        <>
-                          <Ionicons name="construct-outline" size={12} color={isDark ? '#FFFFFF' : '#000000'} />
-                          {' '}Personalizada
-                        </>
-                      ) : (
-                        <>
-                          <Ionicons name="settings-outline" size={12} color={isDark ? '#FFFFFF' : '#000000'} />
-                          {' '}Predefinida
-                        </>
-                      )}
-                    </Text>
+                    
                     {rule.lastTriggered && (
                       <Text style={styles.ruleLastTriggered}>
                         <Ionicons name="time-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
                         {' '}Última activación: {new Date(rule.lastTriggered).toLocaleString()}
                       </Text>
                     )}
+                    
                     {rule.message && (
                       <Text style={styles.ruleMessage}>
                         <Ionicons name="chatbubble-outline" size={12} color={isDark ? '#8E8E93' : '#6D6D70'} />
@@ -560,17 +688,18 @@ export default function NotificationsScreen() {
                       </Text>
                     )}
                   </View>
+                  
                   <View style={styles.ruleActions}>
                     <Switch
-                      value={rule.enabled}
-                      onValueChange={(enabled) => toggleNotificationRule(rule.id, enabled)}
+                      value={rule.status === 'active'}
+                      onValueChange={() => toggleNotification(rule)}
                       trackColor={{ false: '#767577', true: isDark ? '#0A84FF' : '#007AFF' }}
-                      thumbColor={rule.enabled ? '#FFFFFF' : '#f4f3f4'}
+                      thumbColor={rule.status === 'active' ? '#FFFFFF' : '#f4f3f4'}
                     />
-                    {rule.id.startsWith('custom_') && (
+                    {rule.status === 'inactive' && (
                       <TouchableOpacity 
                         style={styles.deleteButton}
-                        onPress={() => deleteNotificationRule(rule.id)}
+                        onPress={() => deleteNotification(rule)}
                       >
                         <Ionicons name="trash-outline" size={16} color="#FF3B30" />
                       </TouchableOpacity>

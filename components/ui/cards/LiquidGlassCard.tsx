@@ -1,7 +1,8 @@
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import { View, ViewProps } from 'react-native';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../../contexts/ThemeContext';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 interface LiquidGlassCardProps extends ViewProps {
   children: React.ReactNode;
@@ -19,17 +20,18 @@ export const LiquidGlassCard: React.FC<LiquidGlassCardProps> = ({
   ...props
 }) => {
   const { isDark } = useTheme();
+  const { responsiveSizes } = useResponsive();
 
   const getCardStyles = () => {
     const baseStyles = {
-      borderRadius: variant === 'modal' ? 20 : 24,
+      borderRadius: variant === 'modal' ? responsiveSizes.borderRadiusLarge : responsiveSizes.borderRadiusLarge,
       overflow: 'hidden' as const,
-      // Liquid Glass effect 100% Apple - Más pronunciado
+      // Liquid Glass effect optimizado para móvil
       backgroundColor: isDark ? 'rgba(0, 0, 0, 0.75)' : 'rgba(255, 255, 255, 0.75)',
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)',
       // Efecto de profundidad sutil sin sombras problemáticas
-      transform: [{ scale: 1.02 }],
+      transform: [{ scale: 1.01 }], // Reducido para móvil
     };
 
     switch (variant) {
@@ -41,12 +43,12 @@ export const LiquidGlassCard: React.FC<LiquidGlassCardProps> = ({
           backgroundColor: isDark ? 'rgba(28, 28, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)',
           borderWidth: 1.5,
           borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
-          transform: [{ scale: 1.01 }],
+          transform: [{ scale: 1.005 }], // Reducido para móvil
         };
       case 'section':
         return {
           ...baseStyles,
-          marginBottom: 20,
+          marginBottom: responsiveSizes.spacingXLarge,
         };
       default:
         return baseStyles;
@@ -58,7 +60,7 @@ export const LiquidGlassCard: React.FC<LiquidGlassCardProps> = ({
   if (useBlur) {
     return (
       <BlurView
-        intensity={intensity || (isDark ? 40 : 50)}
+        intensity={intensity || (isDark ? 30 : 40)} // Reducido para móvil
         tint={isDark ? 'dark' : 'light'}
         style={[cardStyles, style]}
         {...props}
