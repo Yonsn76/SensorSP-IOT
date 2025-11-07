@@ -3,13 +3,12 @@ import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
   Text,
   View,
   Alert,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { NeumorphicForm } from '../ui/forms';
+import { NeumorphicForm, sharedFormStyles } from '../ui/forms';
 import { AnimatedBackground } from '../ui/common';
 
 export const LoginScreen: React.FC = () => {
@@ -61,28 +60,15 @@ export const LoginScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = {
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    position: 'relative' as const,
   },
-  errorContainer: {
-    position: 'absolute',
-    bottom: 50,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#ff7c90',
-    borderRadius: 8,
-    maxWidth: 300,
-  },
-  errorText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-});
+  errorContainer: sharedFormStyles.errorContainer,
+  errorText: sharedFormStyles.errorText,
+};
 
 export default LoginScreen;

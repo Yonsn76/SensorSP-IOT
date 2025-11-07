@@ -3,13 +3,12 @@ import React, { useState, useEffect } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
   Text,
   View,
   Alert,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { NeumorphicRegisterForm } from '../ui/forms';
+import { NeumorphicRegisterForm, sharedFormStyles } from '../ui/forms';
 import { AnimatedBackground } from '../ui/common';
 
 export const RegisterScreen: React.FC = () => {
@@ -105,27 +104,14 @@ export const RegisterScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = {
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
-  errorContainer: {
-    position: 'absolute',
-    bottom: 50,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#ff7c90',
-    borderRadius: 8,
-    maxWidth: 300,
-  },
-  errorText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-});
+  errorContainer: sharedFormStyles.errorContainer,
+  errorText: sharedFormStyles.errorText,
+};
 
 export default RegisterScreen;

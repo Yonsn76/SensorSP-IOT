@@ -511,10 +511,6 @@ export default function NotificationsScreen() {
             <Text style={styles.statLabel}>Alertas Activas</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{notificationHistory.length}</Text>
-            <Text style={styles.statLabel}>Notificaciones</Text>
-          </View>
-          <View style={styles.statCard}>
             <Text style={styles.statNumber}>{notificationRules.length}</Text>
             <Text style={styles.statLabel}>Total Alertas</Text>
           </View>

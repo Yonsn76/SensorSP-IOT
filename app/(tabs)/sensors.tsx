@@ -112,31 +112,6 @@ export default function SensorsScreen() {
     }
   };
 
-  const getStatusColor = (estado: string) => {
-    switch (estado) {
-      case 'activo':
-        return '#34C759';
-      case 'inactivo':
-        return '#FF9500';
-      case 'error':
-        return '#FF3B30';
-      default:
-        return '#8E8E93';
-    }
-  };
-
-  const getStatusText = (estado: string) => {
-    switch (estado) {
-      case 'activo':
-        return 'Activo';
-      case 'inactivo':
-        return 'Inactivo';
-      case 'error':
-        return 'Error';
-      default:
-        return 'Desconocido';
-    }
-  };
 
   useEffect(() => {
     loadSensors();
@@ -310,7 +285,6 @@ export default function SensorsScreen() {
     );
   }
 
-  const activeSensors = sensors.filter(s => s.estado === 'activo');
   const totalReadings = sensors.reduce((sum, s) => sum + s.totalLecturas, 0);
 
   return (
@@ -344,10 +318,6 @@ export default function SensorsScreen() {
             <View style={styles.statCard}>
               <Text style={styles.statNumber}>{sensors.length}</Text>
               <Text style={styles.statLabel}>Total Sensores</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{activeSensors.length}</Text>
-              <Text style={styles.statLabel}>Activos</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statNumber}>{totalReadings}</Text>
@@ -393,8 +363,8 @@ export default function SensorsScreen() {
                       <Text style={styles.sensorType}>
                         <Ionicons name="hardware-chip-outline" size={12} color={isDark ? '#FFFFFF' : '#000000'} /> Tipo: {sensor.tipo} • Modelo: {sensor.modelo}
                       </Text>
-                      <Text style={[styles.sensorStatus, { color: getStatusColor(sensor.estado) }]}>
-                        {getStatusText(sensor.estado)} • {sensor.totalLecturas} lecturas
+                      <Text style={[styles.sensorStatus, { color: isDark ? '#8E8E93' : '#6D6D70' }]}>
+                        {sensor.totalLecturas} lecturas
                       </Text>
                       {sensor.ultimaLectura && (
                         <Text style={styles.sensorLocation}>
