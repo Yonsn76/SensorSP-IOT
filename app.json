@@ -1,0 +1,98 @@
+{
+  "expo": {
+    "name": "SensorSP",
+    "slug": "MiAppMovil",
+    "version": "2025.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/tem_icon.png",
+    "scheme": "sensorsp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.sensorsp.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/tem_icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.WAKE_LOCK"
+      ],
+      "navigationBar": {
+        "backgroundColor": "#FFFFFF",
+        "barStyle": "dark-content"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/tem_icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/tem_icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "SensorSPSmallWidget",
+              "label": "SensorSP Pequeño",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "description": "Widget pequeño con temperatura y humedad",
+              "previewImage": "./assets/images/tem_icon.png",
+              "updatePeriodMillis": 900000,
+              "widgetFeatures": "reconfigurable|configuration_optional",
+              "configure": "SensorSPWidgetConfigActivity"
+            },
+            {
+              "name": "SensorSPMediumWidget",
+              "label": "SensorSP Mediano",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "description": "Widget mediano con más detalles",
+              "previewImage": "./assets/images/tem_icon.png",
+              "updatePeriodMillis": 900000,
+              "widgetFeatures": "reconfigurable|configuration_optional",
+              "configure": "SensorSPWidgetConfigActivity"
+            },
+            {
+              "name": "SensorSPLargeWidget",
+              "label": "SensorSP Grande",
+              "minWidth": "250dp",
+              "minHeight": "250dp",
+              "description": "Widget grande con dashboard completo",
+              "previewImage": "./assets/images/tem_icon.png",
+              "updatePeriodMillis": 900000,
+              "widgetFeatures": "reconfigurable|configuration_optional",
+              "configure": "SensorSPWidgetConfigActivity"
+            }
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "58391c9f-bf48-43e0-9ca8-7c108325a63f"
+      }
+    },
+    "owner": "yonsn76"
+  }
+}
